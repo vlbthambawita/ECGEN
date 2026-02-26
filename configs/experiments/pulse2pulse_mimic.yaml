@@ -1,7 +1,20 @@
 experiment:
   name: pulse2pulse_mimic
   seed: 42
-  output_dir: outputs/pulse2pulse
+  runs_root: runs
+
+wandb:
+  enabled: true
+  project: ecg-pulse2pulse
+  entity: null  # Set to your wandb username/team or leave null for default
+  run_name: null  # Auto-generated if null
+  tags:
+    - pulse2pulse
+    - wavegan
+    - ecg-generation
+  notes: "Pulse2Pulse WaveGAN training on MIMIC-IV-ECG"
+  log_model: False  # Log model checkpoints to wandb
+  log_freq: 50  # Log frequency (steps)
 
 model:
   target: ecgen.models.pulse2pulse.Pulse2PulseGAN
@@ -23,14 +36,27 @@ data:
       data_dir: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
       batch_size: 128
       num_workers: 4
-      max_samples: null
-      skip_missing_check: true
+      max_samples: 10000  # Use full dataset (set to 1000 for quick testing)
+      skip_missing_check: False
       num_channels: 8
       seq_length: 5000
+
+callbacks:
+  - target: ecgen.training.callbacks.ECGVisualizationCallback
+    params:
+      save_dir: runs/pulse2pulse_mimic/seed_42/samples
+      every_n_epochs: 10
+      n_samples: 1
+  - target: ecgen.training.callbacks.GeneratedSamplesCallback
+    params:
+      save_dir: runs/pulse2pulse_mimic/seed_42/samples
+      every_n_epochs: 25
+      n_samples: 16
 
 trainer:
   max_epochs: 300
   accelerator: "gpu"
   devices: [0]
   log_every_n_steps: 50
+  check_val_every_n_epoch: 5
 

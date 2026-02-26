@@ -91,7 +91,7 @@ class WaveGANGenerator(nn.Module):
         self,
         model_size: int = 50,
         num_channels: int = 8,
-        post_proc_filt_len: int = 512,
+        post_proc_filt_len: int = 0,
         verbose: bool = False,
         upsample: bool = True,
     ) -> None:
@@ -118,7 +118,7 @@ class WaveGANGenerator(nn.Module):
         self.conv_5 = nn.Conv1d(model_size * 3, model_size * 5, 25, stride=5, padding=25 // 2)
         self.conv_6 = nn.Conv1d(model_size * 5, model_size * 5, 25, stride=5, padding=25 // 2)
 
-        if post_proc_filt_len:
+        if post_proc_filt_len and post_proc_filt_len > 0:
             self.post_proc_filter = nn.Conv1d(num_channels, num_channels, post_proc_filt_len)
         else:
             self.post_proc_filter = None
@@ -312,6 +312,9 @@ class Pulse2PulseGAN(pl.LightningModule):
         )
 
         self.automatic_optimization = False
+        
+        self._val_real_sample: Tensor | None = None
+        self._val_fake_sample: Tensor | None = None
 
     def forward(self, noise: Tensor) -> Tensor:
         return self.netG(noise)
@@ -362,6 +365,36 @@ class Pulse2PulseGAN(pl.LightningModule):
         self.log("train/g_loss", g_loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return d_loss
+
+    def validation_step(self, batch: Any, batch_idx: int) -> Tensor:
+        real_ecgs: Tensor = batch["ecg_signals"]
+        device = real_ecgs.device
+        b_size = real_ecgs.size(0)
+
+        noise = self._sample_noise(b_size, device)
+        fake = self.netG(noise)
+
+        d_real = self.netD(real_ecgs).mean()
+        d_fake = self.netD(fake).mean()
+        d_wasserstein = d_real - d_fake
+
+        self.log("val/d_wasserstein", d_wasserstein, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_loss", -d_wasserstein, on_step=False, on_epoch=True, prog_bar=True)
+
+        if batch_idx == 0:
+            self._val_real_sample = real_ecgs[0].detach().cpu()
+            self._val_fake_sample = fake[0].detach().cpu()
+
+        return d_wasserstein
+
+    @torch.no_grad()
+    def generate_samples(self, n_samples: int = 16) -> Tensor:
+        """Generate ECG samples from random noise."""
+        self.netG.eval()
+        device = next(self.netG.parameters()).device
+        noise = self._sample_noise(n_samples, device)
+        fake = self.netG(noise)
+        return fake
 
     def configure_optimizers(self) -> Any:
         opt_g = torch.optim.Adam(
