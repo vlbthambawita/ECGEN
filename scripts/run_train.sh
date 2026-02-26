@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG="${1:-configs/experiments/exp01_imn_ptbxl_100hz.yaml}"
+CONFIG="${1:-configs/experiments/pulse2pulse_mimic.yaml}"
 
-python -m my_project.training.train --config "${CONFIG}"
+python -m ecgen.training.train --config "${CONFIG}"
