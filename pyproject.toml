@@ -11,5 +11,8 @@ dependencies = [
     "torch",
     "pyyaml",
     "pytorch-lightning",
+    "pandas",
+    "scikit-learn",
+    "wfdb",
 ]
 

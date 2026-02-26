@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from ecgen.utils.io import read_yaml
+from ecgen.utils.io import read_yaml, write_yaml, write_json
 from ecgen.utils.logging import get_logger
+from ecgen.utils.metadata import collect_run_metadata
 from ecgen.utils.seed import set_global_seed
 
 
@@ -68,22 +70,63 @@ def main() -> None:
 
     exp_cfg = cfg.get("experiment", {})
     exp_name = exp_cfg.get("name", "ecg_experiment")
-    output_dir = Path(exp_cfg.get("output_dir", "outputs"))
+    seed = int(exp_cfg.get("seed", 42))
+
+    # Standardized run directory:
+    # runs/<experiment_name>/seed_<N>/
+    runs_root = Path(exp_cfg.get("runs_root", "runs"))
+    run_dir = runs_root / exp_name / f"seed_{seed}"
+    checkpoints_dir = run_dir / "checkpoints"
+    metrics_dir = run_dir / "metrics"
+    preds_dir = run_dir / "preds"
+
+    for d in (checkpoints_dir, metrics_dir, preds_dir):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Save resolved config and metadata for this run
+    write_yaml(cfg, run_dir / "config_resolved.yaml")
+    metadata = collect_run_metadata(
+        config_path=config_path,
+        cfg=cfg,
+        run_dir=run_dir,
+        argv=None,
+    )
+    write_json(metadata, run_dir / "metadata.json")
 
     tb_logger = TensorBoardLogger(
-        save_dir=str(output_dir),
-        name=exp_name,
+        save_dir=str(run_dir),
+        name="tb",
+    )
+
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=str(checkpoints_dir),
+        filename="epoch{epoch:03d}-step{step:06d}",
+        save_last=True,
+        save_top_k=1,
+        monitor="val_loss",
+        mode="min",
+        auto_insert_metric_name=False,
     )
 
     trainer = pl.Trainer(
-        default_root_dir=str(output_dir),
+        default_root_dir=str(run_dir),
         logger=tb_logger,
+        callbacks=[checkpoint_callback],
         **trainer_cfg,
     )
 
     logger.info(f"Starting training for experiment '{exp_name}' with config: {config_path}")
     trainer.fit(model=model, datamodule=datamodule)
     logger.info("Training finished.")
+
+    # Persist final metrics snapshot into the run directory
+    callback_metrics = {k: float(v) for k, v in trainer.callback_metrics.items()}
+    logged_metrics = {k: float(v) for k, v in trainer.logged_metrics.items()}
+    metrics_payload = {
+        "callback_metrics": callback_metrics,
+        "logged_metrics": logged_metrics,
+    }
+    write_json(metrics_payload, metrics_dir / "train_val_metrics.json")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ class ECGDatasetAdapter(Dataset):
         self.num_leads = num_leads
 
     def __len__(self) -> int:
-        return len(self.base)
+        return len(self.base)  # type: ignore[arg-type]
 
     def __getitem__(self, idx: int):
         ecg, _ = self.base[idx]
@@ -44,7 +44,7 @@ class Pulse2PulseMIMICDataModule(pl.LightningDataModule):
     """
     LightningDataModule for MIMIC‑IV‑ECG ECG generation with Pulse2Pulse.
 
-    This reuses the dataset implementation from the ecg_diffusion project.
+    Uses native ecgen.data.mimic_dataset.MIMICIVECGDataset.
     """
 
     def __init__(self, config: Pulse2PulseMIMICConfig | dict) -> None:
@@ -60,25 +60,23 @@ class Pulse2PulseMIMICDataModule(pl.LightningDataModule):
         if self.train_dataset is not None and self.val_dataset is not None:
             return
 
-        try:
-            from ecg_diffusion.data.dataset import MIMICIVECGDataset
-        except Exception as e:  # pragma: no cover - import depends on external repo
-            raise ImportError(
-                "ecg_diffusion.data.dataset.MIMICIVECGDataset is required for Pulse2PulseMIMICDataModule.\n"
-                "Make sure the ecg_diffusion project is installed or available on PYTHONPATH."
-            ) from e
+        from ecgen.data.mimic_dataset import MIMICIVECGDataset
 
         train_base = MIMICIVECGDataset(
             mimic_path=self.config.data_dir,
             split="train",
             max_samples=self.config.max_samples,
             skip_missing_check=self.config.skip_missing_check,
+            num_leads=12,
+            seq_length=self.config.seq_length,
         )
         val_base = MIMICIVECGDataset(
             mimic_path=self.config.data_dir,
             split="val",
-            max_samples=min(self.config.max_samples or 100, 100),
+            max_samples=min(self.config.max_samples or 1000, 1000),
             skip_missing_check=self.config.skip_missing_check,
+            num_leads=12,
+            seq_length=self.config.seq_length,
         )
 
         self.train_dataset = ECGDatasetAdapter(train_base, num_leads=self.config.num_channels)

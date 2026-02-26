@@ -1,0 +1,27 @@
+{
+  "command": "/work/vajira/DL2026/ECGEN/src/ecgen/training/train.py --config configs/experiments/pulse2pulse_mimic.yaml",
+  "config_path": "/work/vajira/DL2026/ECGEN/configs/experiments/pulse2pulse_mimic.yaml",
+  "env": {
+    "CUDA_VISIBLE_DEVICES": null
+  },
+  "experiment": {
+    "name": "pulse2pulse_mimic",
+    "seed": 42
+  },
+  "git": {
+    "commit": "2de10e1e08b1cda6355bcbe5eae8a07bf5403916",
+    "is_dirty": true,
+    "root": "/work/vajira/DL2026/ECGEN"
+  },
+  "packages": {
+    "ecgen": null,
+    "pytorch_lightning": "2.0.2",
+    "torch": "2.10.0"
+  },
+  "python": {
+    "executable": "/home/vajira/anaconda3/envs/pytorch2/bin/python",
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+    "version": "3.10.11 (main, Apr 20 2023, 19:02:41) [GCC 11.2.0]"
+  },
+  "run_dir": "/work/vajira/DL2026/ECGEN/runs/pulse2pulse_mimic/seed_42"
+}

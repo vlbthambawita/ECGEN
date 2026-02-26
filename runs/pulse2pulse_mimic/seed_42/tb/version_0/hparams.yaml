@@ -1,0 +1,8 @@
+model_size: 50
+num_channels: 8
+seq_length: 5000
+lr: 0.0001
+b1: 0.5
+b2: 0.9
+lmbda: 10.0
+n_critic: 5

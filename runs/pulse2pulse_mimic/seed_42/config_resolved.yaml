@@ -1,0 +1,33 @@
+data:
+  params:
+    config:
+      batch_size: 128
+      data_dir: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+      max_samples: null
+      num_channels: 8
+      num_workers: 4
+      seq_length: 5000
+      skip_missing_check: true
+  target: ecgen.data.pulse2pulse_mimic.Pulse2PulseMIMICDataModule
+experiment:
+  name: pulse2pulse_mimic
+  output_dir: outputs/pulse2pulse
+  seed: 42
+model:
+  params:
+    config:
+      b1: 0.5
+      b2: 0.9
+      lmbda: 10.0
+      lr: 0.0001
+      model_size: 50
+      n_critic: 5
+      num_channels: 8
+      seq_length: 5000
+  target: ecgen.models.pulse2pulse.Pulse2PulseGAN
+trainer:
+  accelerator: gpu
+  devices:
+  - 0
+  log_every_n_steps: 50
+  max_epochs: 300
