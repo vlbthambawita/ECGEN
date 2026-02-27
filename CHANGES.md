@@ -6,17 +6,18 @@ Added comprehensive visualization capabilities to monitor VAE reconstruction qua
 
 ---
 
-## New Files
+## New/Modified Files
 
 ### 1. Core Implementation
-- **`scripts/callbacks/vae_visualization.py`** (9.7 KB)
-  - PyTorch Lightning callback for VAE visualization
+- **`src/ecgen/training/callbacks.py`** (MODIFIED - added ~270 lines)
+  - Added VAEVisualizationCallback class
   - Two visualization modes: separate leads and overlaid leads
   - Supports TensorBoard and Weights & Biases logging
   - Configurable frequency, sample count, and plot style
 
-- **`scripts/callbacks/__init__.py`** (135 bytes)
-  - Package initialization for callbacks module
+- **`src/ecgen/training/__init__.py`** (NEW - 350 bytes)
+  - Training module initialization
+  - Exports all callback classes
 
 ### 2. Documentation
 - **`docs/VAE_VISUALIZATION.md`** (7.2 KB)
@@ -246,10 +247,12 @@ All components have been tested:
 
 ```
 DL2026/ECGEN/
+├── src/
+│   └── ecgen/
+│       └── training/
+│           ├── __init__.py                [NEW]
+│           └── callbacks.py               [MODIFIED - added VAEVisualizationCallback]
 ├── scripts/
-│   ├── callbacks/
-│   │   ├── __init__.py                    [NEW]
-│   │   └── vae_visualization.py           [NEW]
 │   ├── train_vae_mimic.py                 [MODIFIED]
 │   ├── run_train_vae_mimic_config.sh      [UNCHANGED]
 │   └── README_VISUALIZATION.md            [NEW]

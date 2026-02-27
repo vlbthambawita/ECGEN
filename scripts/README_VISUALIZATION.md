@@ -98,7 +98,7 @@ visualization:
 
 ## Files
 
-- **Callback**: `scripts/callbacks/vae_visualization.py`
+- **Callback**: `src/ecgen/training/callbacks.py` (VAEVisualizationCallback)
 - **Training Script**: `scripts/train_vae_mimic.py`
 - **Config**: `configs/experiments/vae_mimic.yaml`
 - **Documentation**: `docs/VAE_VISUALIZATION.md`

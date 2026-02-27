@@ -113,9 +113,9 @@ plot_all_leads: false
 
 ### Core Implementation
 ```
-scripts/callbacks/
-├── __init__.py                    # Package initialization
-└── vae_visualization.py           # Visualization callback (270 lines)
+src/ecgen/training/
+├── __init__.py                    # Training module initialization
+└── callbacks.py                   # All callbacks including VAEVisualizationCallback
 ```
 
 ### Documentation

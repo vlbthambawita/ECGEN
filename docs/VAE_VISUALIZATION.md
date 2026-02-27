@@ -162,10 +162,10 @@ Each visualization is ~500KB-1MB depending on settings. For 100 epochs with `eve
 
 ### Custom Visualization Callback
 
-You can customize the visualization by modifying `scripts/callbacks/vae_visualization.py`:
+You can customize the visualization by using the callback directly:
 
 ```python
-from callbacks.vae_visualization import VAEVisualizationCallback
+from ecgen.training.callbacks import VAEVisualizationCallback
 
 # Create custom callback
 custom_viz = VAEVisualizationCallback(
@@ -182,7 +182,7 @@ custom_viz = VAEVisualizationCallback(
 
 ```python
 import pytorch_lightning as pl
-from callbacks.vae_visualization import VAEVisualizationCallback
+from ecgen.training.callbacks import VAEVisualizationCallback
 
 # Add to your trainer
 trainer = pl.Trainer(
@@ -236,7 +236,7 @@ trainer = pl.Trainer(
 
 ## References
 
-- Visualization callback: `scripts/callbacks/vae_visualization.py`
+- Visualization callback: `src/ecgen/training/callbacks.py` (VAEVisualizationCallback)
 - Training script: `scripts/train_vae_mimic.py`
 - Config file: `configs/experiments/vae_mimic.yaml`
 - Main training script: `scripts/run_train_vae_mimic_config.sh`

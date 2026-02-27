@@ -6,16 +6,17 @@ A comprehensive visualization system to monitor VAE reconstruction quality durin
 
 ## Files Created/Modified
 
-### New Files Created
+### New/Modified Files
 
-1. **`scripts/callbacks/vae_visualization.py`**
-   - Custom PyTorch Lightning callback for VAE visualization
+1. **`src/ecgen/training/callbacks.py`** (MODIFIED)
+   - Added VAEVisualizationCallback class
    - Two visualization modes: separate leads and overlaid leads
    - TensorBoard and Weights & Biases integration
    - ~270 lines of well-documented code
 
-2. **`scripts/callbacks/__init__.py`**
-   - Module initialization for callbacks package
+2. **`src/ecgen/training/__init__.py`** (NEW)
+   - Module initialization for training package
+   - Exports all callback classes
 
 3. **`docs/VAE_VISUALIZATION.md`**
    - Comprehensive documentation

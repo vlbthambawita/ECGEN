@@ -16,12 +16,11 @@ from pytorch_lightning.loggers import TensorBoardLogger
 # Add src to path for imports
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
-sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from ecgen.models.vae import VAELightning, VAEConfig
 from ecgen.data.mimic_dataset import MIMICIVECGDataset
 from ecgen.utils.seed import set_global_seed
-from callbacks.vae_visualization import VAEVisualizationCallback
+from ecgen.training.callbacks import VAEVisualizationCallback
 
 import torch
 from torch.utils.data import DataLoader
