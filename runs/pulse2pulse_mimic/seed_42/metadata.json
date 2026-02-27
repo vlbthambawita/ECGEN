@@ -9,8 +9,8 @@
     "seed": 42
   },
   "git": {
-    "commit": "444ccf5b12ce1ce22df823327ff35541796372c3",
-    "is_dirty": true,
+    "commit": "fa4ed7222b652dcf89cf90db0f38ede727f94171",
+    "is_dirty": false,
     "root": "/work/vajira/DL2026/ECGEN"
   },
   "packages": {
