@@ -16,10 +16,12 @@ from pytorch_lightning.loggers import TensorBoardLogger
 # Add src to path for imports
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from ecgen.models.vae import VAELightning, VAEConfig
 from ecgen.data.mimic_dataset import MIMICIVECGDataset
 from ecgen.utils.seed import set_global_seed
+from callbacks.vae_visualization import VAEVisualizationCallback
 
 import torch
 from torch.utils.data import DataLoader
@@ -254,6 +256,13 @@ def parse_args() -> argparse.Namespace:
     # Resume
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
     
+    # Visualization
+    parser.add_argument("--viz-every-n-epochs", type=int, default=5, help="Generate visualizations every N epochs")
+    parser.add_argument("--viz-num-samples", type=int, default=4, help="Number of samples to visualize")
+    parser.add_argument("--viz-plot-all-leads", action="store_true", help="Plot all leads separately (default: overlay)")
+    parser.add_argument("--viz-log-to-tensorboard", action="store_true", default=True, help="Log visualizations to TensorBoard")
+    parser.add_argument("--viz-log-to-wandb", action="store_true", help="Log visualizations to W&B")
+    
     return parser.parse_args()
 
 
@@ -319,6 +328,14 @@ def main() -> None:
                 args.wandb_entity = wandb_cfg.get('entity', args.wandb_entity)
                 args.wandb_run_name = wandb_cfg.get('run_name', args.wandb_run_name)
                 args.wandb_tags = wandb_cfg.get('tags', args.wandb_tags)
+        
+        if 'visualization' in yaml_config:
+            viz_cfg = yaml_config['visualization']
+            args.viz_every_n_epochs = viz_cfg.get('every_n_epochs', args.viz_every_n_epochs)
+            args.viz_num_samples = viz_cfg.get('num_samples', args.viz_num_samples)
+            args.viz_plot_all_leads = viz_cfg.get('plot_all_leads', args.viz_plot_all_leads)
+            args.viz_log_to_tensorboard = viz_cfg.get('log_to_tensorboard', args.viz_log_to_tensorboard)
+            args.viz_log_to_wandb = viz_cfg.get('log_to_wandb', args.viz_log_to_wandb)
         
         print(f"Configuration loaded successfully")
         print(f"Experiment: {args.exp_name}")
@@ -430,7 +447,17 @@ def main() -> None:
     
     lr_monitor = LearningRateMonitor(logging_interval="step")
     
-    callbacks = [checkpoint_callback, early_stop_callback, lr_monitor]
+    # Visualization callback
+    viz_callback = VAEVisualizationCallback(
+        save_dir=samples_dir,
+        log_every_n_epochs=args.viz_every_n_epochs,
+        num_samples=args.viz_num_samples,
+        plot_all_leads=args.viz_plot_all_leads,
+        log_to_tensorboard=args.viz_log_to_tensorboard,
+        log_to_wandb=args.viz_log_to_wandb,
+    )
+    
+    callbacks = [checkpoint_callback, early_stop_callback, lr_monitor, viz_callback]
     
     # Trainer
     trainer = pl.Trainer(

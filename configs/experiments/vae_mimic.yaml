@@ -70,3 +70,10 @@ trainer:
   check_val_every_n_epoch: 5
   gradient_clip_val: 1.0
   deterministic: true
+
+visualization:
+  every_n_epochs: 5  # Generate visualizations every N epochs
+  num_samples: 4  # Number of samples to visualize
+  plot_all_leads: true  # Plot all leads separately (false for overlay)
+  log_to_tensorboard: true  # Log to TensorBoard
+  log_to_wandb: false  # Log to Weights & Biases (set to true if using wandb)
