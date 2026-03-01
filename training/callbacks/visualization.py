@@ -204,6 +204,10 @@ class VAEVisualizationCallback(Callback):
     
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         """Called at the end of validation epoch."""
+        # Skip during sanity check
+        if trainer.sanity_checking:
+            return
+            
         current_epoch = trainer.current_epoch
         
         # Only log at specified intervals
@@ -230,6 +234,8 @@ class VAEVisualizationCallback(Callback):
         with torch.no_grad():
             if hasattr(pl_module, 'vae'):
                 recon, _, _ = pl_module.vae(ecg)
+            elif hasattr(pl_module, 'vqvae'):
+                recon, _, _ = pl_module.vqvae(ecg)
             else:
                 recon, _, _ = pl_module(ecg)
         pl_module.train()
@@ -249,7 +255,9 @@ class VAEVisualizationCallback(Callback):
         fig.savefig(save_path, dpi=150, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"[Epoch {current_epoch}] Saved VAE visualization to: {save_path}")
+        print(f"\n{'='*60}")
+        print(f"[Epoch {current_epoch}] Saved visualization to: {save_path}")
+        print(f"{'='*60}\n")
         
         # Log to TensorBoard
         if self.log_to_tensorboard and trainer.logger is not None:

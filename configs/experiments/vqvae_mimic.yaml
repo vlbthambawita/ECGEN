@@ -4,7 +4,7 @@ experiment:
   runs_root: runs
 
 wandb:
-  enabled: false  # Set to true to enable Weights & Biases logging
+  enabled: true  # Set to true to enable Weights & Biases logging
   project: ecg-vqvae
   entity: null  # Set to your wandb username/team or leave null for default
   run_name: null  # Auto-generated if null
@@ -73,7 +73,7 @@ trainer:
   deterministic: true
 
 visualization:
-  every_n_epochs: 5
+  every_n_epochs: 1
   num_samples: 4
   plot_all_leads: true
   log_to_tensorboard: false
