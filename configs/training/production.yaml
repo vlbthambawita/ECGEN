@@ -1,0 +1,31 @@
+# Production Training Configuration
+
+training:
+  # Full training
+  max_epochs: 200
+  
+  # Optimization
+  lr: 0.0001
+  optimizer: adam
+  weight_decay: 0.0001
+  
+  # Learning rate scheduler
+  scheduler: cosine
+  scheduler_params:
+    T_max: 200
+    eta_min: 0.00001
+  
+  # Callbacks
+  early_stopping: true
+  patience: 20
+  checkpoint_every_n_epochs: 5
+  save_top_k: 3
+  
+  # Logging
+  log_every_n_steps: 50
+  
+  # Precision
+  precision: 16  # Mixed precision training
+  
+  # Gradient clipping
+  gradient_clip_val: 1.0

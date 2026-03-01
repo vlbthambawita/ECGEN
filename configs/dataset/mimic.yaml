@@ -1,0 +1,25 @@
+# MIMIC-IV-ECG Dataset Configuration
+
+dataset:
+  name: mimic
+  data_dir: data/raw/mimic
+  
+  # Signal properties
+  num_leads: 12
+  seq_length: 5000
+  sampling_rate: 500  # Hz
+  
+  # Data loading
+  batch_size: 32
+  num_workers: 4
+  
+  # Splits
+  val_split: 0.1
+  test_split: 0.1
+  
+  # Preprocessing
+  normalize: true
+  skip_missing_check: false
+  
+  # Optional: limit dataset size for testing
+  max_samples: null  # Set to integer for testing

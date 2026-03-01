@@ -7,10 +7,18 @@ __pycache__/
 env/
 venv/
 .venv/
+
+# Training outputs
 wandb/
 runs/
+outputs/
+*.ckpt
+*.pth
 wandb.lock
 
+# Data
+data/raw/
+data/processed/
 
 # Packaging
 build/
@@ -21,6 +29,15 @@ dist/
 .vscode/
 .idea/
 
+# Notebooks
+notebooks/**/*.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# Test outputs
+test_output/
+.pytest_cache/
+
 # Misc
 *.log
+.DS_Store
 

@@ -1,0 +1,25 @@
+# Fast Development Training Configuration
+
+training:
+  # Quick training for development/testing
+  max_epochs: 10
+  limit_train_batches: 100
+  limit_val_batches: 20
+  
+  # Optimization
+  lr: 0.001
+  optimizer: adam
+  
+  # No scheduler for fast dev
+  scheduler: null
+  
+  # Callbacks
+  early_stopping: false
+  checkpoint_every_n_epochs: 5
+  
+  # Logging
+  log_every_n_steps: 10
+  
+  # Debugging
+  fast_dev_run: false
+  overfit_batches: 0

@@ -3,16 +3,30 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ecggen"
-version = "0.1.0"
-description = "ECG generation and modeling experiments"
+name = "ecgen"
+version = "0.2.0"
+description = "ECG generation and modeling with VAE, GAN, Diffusion, and SSM models"
 requires-python = ">=3.8"
 dependencies = [
-    "torch",
+    "torch>=1.10",
+    "pytorch-lightning>=1.5",
     "pyyaml",
-    "pytorch-lightning",
     "pandas",
     "scikit-learn",
     "wfdb",
+    "matplotlib",
+    "scipy",
+    "numpy",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[tool.setuptools]
+packages = ["models", "data", "training", "evaluation", "utils", "visualization"]
 

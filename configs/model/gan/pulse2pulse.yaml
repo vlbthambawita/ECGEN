@@ -1,0 +1,20 @@
+# Pulse2Pulse GAN Configuration
+
+model:
+  type: gan
+  architecture: pulse2pulse
+  
+  # Generator
+  generator:
+    latent_dim: 100
+    base_channels: 64
+  
+  # Discriminator
+  discriminator:
+    base_channels: 64
+  
+  # Training hyperparameters
+  lr_g: 0.0002
+  lr_d: 0.0002
+  b1: 0.5
+  b2: 0.999
