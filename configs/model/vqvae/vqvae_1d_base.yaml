@@ -1,0 +1,21 @@
+# VQ-VAE 1D Base Configuration
+
+model:
+  type: vqvae
+  architecture: vqvae_1d
+  
+  # Model architecture
+  in_channels: 12
+  base_channels: 64
+  latent_channels: 64
+  channel_multipliers: [1, 2, 4, 4]
+  num_res_blocks: 2
+  
+  # Vector quantization
+  num_embeddings: 512
+  commitment_cost: 0.25
+  
+  # Training hyperparameters
+  lr: 0.0001
+  b1: 0.9
+  b2: 0.999

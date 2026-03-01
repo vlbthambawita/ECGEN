@@ -1,0 +1,18 @@
+# PixelCNN Prior Base Configuration
+
+model:
+  type: prior
+  architecture: pixelcnn_prior
+  
+  # Model architecture
+  num_embeddings: 512
+  hidden_dim: 128
+  num_layers: 3
+  
+  # Training hyperparameters
+  lr: 0.001
+  b1: 0.9
+  b2: 0.999
+  
+  # VQ-VAE checkpoint (required for training)
+  vqvae_checkpoint: ""

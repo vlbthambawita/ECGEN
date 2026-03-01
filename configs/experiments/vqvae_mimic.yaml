@@ -1,0 +1,80 @@
+experiment:
+  name: vqvae_mimic
+  seed: 42
+  runs_root: runs
+
+wandb:
+  enabled: false  # Set to true to enable Weights & Biases logging
+  project: ecg-vqvae
+  entity: null  # Set to your wandb username/team or leave null for default
+  run_name: null  # Auto-generated if null
+  tags:
+    - vqvae
+    - ecg-generation
+    - mimic-iv-ecg
+  notes: "VQ-VAE training on MIMIC-IV-ECG for discrete latent representation learning"
+  log_model: false
+  log_freq: 50
+
+model:
+  target: models.vqvae.VQVAELightning
+  params:
+    config:
+      in_channels: 12
+      base_channels: 64
+      latent_channels: 64
+      channel_multipliers: [1, 2, 4, 4]
+      num_res_blocks: 2
+      num_embeddings: 512
+      commitment_cost: 0.25
+      lr: 0.0001
+      b1: 0.9
+      b2: 0.999
+
+data:
+  target: data.datasets.mimic.MIMICIVECGDataset
+  params:
+    mimic_path: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+    batch_size: 32
+    num_workers: 4
+    max_samples:  null # Use full dataset (set to 1000 for quick testing)
+    skip_missing_check: false
+    val_split: 0.1
+    test_split: 0.1
+    num_leads: 12
+    seq_length: 5000
+
+callbacks:
+  - target: pytorch_lightning.callbacks.ModelCheckpoint
+    params:
+      dirpath: runs/vqvae_mimic/seed_42/checkpoints
+      filename: epoch{epoch:03d}-step{step:06d}
+      save_last: true
+      save_top_k: 3
+      monitor: val_loss
+      mode: min
+  - target: pytorch_lightning.callbacks.EarlyStopping
+    params:
+      monitor: val_loss
+      patience: 10
+      mode: min
+      verbose: true
+  - target: pytorch_lightning.callbacks.LearningRateMonitor
+    params:
+      logging_interval: step
+
+trainer:
+  max_epochs: 100
+  accelerator: "gpu"
+  devices: [0]
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 5
+  gradient_clip_val: 1.0
+  deterministic: true
+
+visualization:
+  every_n_epochs: 5
+  num_samples: 4
+  plot_all_leads: true
+  log_to_tensorboard: false
+  log_to_wandb: false
