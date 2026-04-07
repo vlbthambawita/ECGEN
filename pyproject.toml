@@ -18,6 +18,9 @@ dependencies = [
     "wfdb",
 ]
 
+[project.optional-dependencies]
+hf = ["huggingface_hub>=0.20"]
+
 [project.urls]
 Homepage = "https://github.com/vlbthambawita/ECGEN"
 
