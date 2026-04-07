@@ -20,6 +20,8 @@ dependencies = [
 
 [project.optional-dependencies]
 hf = ["huggingface_hub>=0.20", "python-dotenv>=1.0"]
+plot = ["ecgplot", "matplotlib"]
+all = ["huggingface_hub>=0.20", "python-dotenv>=1.0", "ecgplot", "matplotlib"]
 
 [project.urls]
 Homepage = "https://github.com/vlbthambawita/ECGEN"

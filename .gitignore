@@ -11,6 +11,7 @@ wandb/
 runs/
 wandb.lock
 
+outputs/
 
 # Packaging
 build/

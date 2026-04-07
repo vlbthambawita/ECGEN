@@ -77,6 +77,55 @@ model = Pulse2PulseGAN(config)
 
 ---
 
+## Generating ECG Signals
+
+Generate synthetic 8-lead ECG signals from any trained Pulse2Pulse checkpoint — local or directly from HuggingFace Hub:
+
+```python
+from ecgen import generate
+
+# From HuggingFace Hub — downloaded once, cached forever
+paths = generate(
+    model_path="hf://vlbthambawita/ECGEN/pulse2pulse/ptbxl/pulse2pulse_exp_ptbxl_full_epoch:900.pt",
+    n_samples=10,
+    output_dir="outputs/generated",
+)
+# → outputs/generated/sample_01.csv … sample_10.csv
+
+# Local checkpoint
+paths = generate(
+    model_path="checkpoints/pulse2pulse_ptbxl_epoch900.pt",
+    n_samples=10,
+    output_dir="outputs/generated",
+)
+
+# Without headers
+generate(..., header=False)
+
+# With ECG plot images (requires: pip install 'ecgen[plot]')
+generate(..., ecgplot=True)
+# → also saves sample_01.png … sample_10.png
+```
+
+Each CSV has **5000 rows × 8 columns** (one row per time step, columns = `I, II, V1, V2, V3, V4, V5, V6`).
+
+**HF path format:** `hf://<owner>/<repo>/<path_in_repo>`  
+Files are cached in `~/.cache/huggingface/hub/` after the first download. Set `HF_TOKEN` in `.env` for private repos.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `model_path` | — | Local `.pt` path **or** `hf://owner/repo/path` |
+| `n_samples` | — | Number of ECGs to generate |
+| `output_dir` | — | Output directory (created if absent) |
+| `format` | `"csv"` | Output format (`"csv"`) |
+| `header` | `True` | Include lead-name header row in CSV |
+| `ecgplot` | `False` | Also save `.png` ECG plot per sample |
+| `model_size` | `50` | Generator `model_size` (must match training) |
+| `batch_size` | `32` | Samples per GPU forward pass |
+| `device` | auto | `"cuda"`, `"cpu"`, or `None` (auto) |
+
+---
+
 ## Training
 
 ### VAE

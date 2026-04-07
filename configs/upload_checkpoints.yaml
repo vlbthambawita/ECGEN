@@ -1,7 +1,7 @@
 # HuggingFace checkpoint upload configuration
 # Repository: https://huggingface.co/{hf_username}/ECGEN
 
-hf_repo_id: "ECGEN"          # HuggingFace repo name (username/ECGEN or org/ECGEN)
+hf_repo_id: "vlbthambawita/ECGEN"          # HuggingFace repo name (username/ECGEN or org/ECGEN)
 hf_repo_type: "model"        # "model", "dataset", or "space"
 commit_message: "Upload model checkpoints"
 private: false               # Set to true to make the repo private on creation

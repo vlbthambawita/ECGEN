@@ -49,10 +49,33 @@ python scripts/train_vae_mimic.py \
 
 Run outputs land in `runs/{exp_name}/seed_{seed}/` with `checkpoints/`, `samples/`, and `tb/` subdirectories.
 
+## Generating ECG signals
+
+```python
+from ecgen import generate
+
+paths = generate(
+    model_path="checkpoints/pulse2pulse_ptbxl_epoch900.pt",
+    n_samples=10,
+    output_dir="outputs/",          # created if absent
+    format="csv",                   # only "csv" supported currently
+    header=True,                    # include I,II,V1–V6 header row
+    ecgplot=False,                  # True → also save .png per sample
+    model_size=50,                  # must match training config
+)
+```
+
+Each CSV: 5000 rows × 8 columns (`I, II, V1, V2, V3, V4, V5, V6`), one file per sample.
+
+`ecgen.generate` is implemented in `src/ecgen/generate.py`. Key detail: checkpoints saved by the original Pulse2Pulse repo use `Conv1dTrans` and `ppfilter1` as state-dict keys; the function remaps these to `conv1d_transpose` and `post_proc_filter` before loading into the ECGEN model. This is handled by `_remap_state_dict()` in that file.
+
+ECG plots require `pip install 'ecgen[plot]'` (adds `ecgplot` + `matplotlib`).
+
 ## Code architecture
 
 ```
 src/ecgen/
+├── generate.py    — ecgen.generate(): load checkpoint → generate CSV / ECG plots
 ├── models/
 │   ├── vae.py          — ResidualBlock1D → Encoder1D/Decoder1D → VAE1D → VAELightning
 │   └── pulse2pulse.py  — WaveGANGenerator, WaveGANDiscriminator, Pulse2PulseGAN
@@ -64,6 +87,8 @@ src/ecgen/
 │   ├── losses.py       — loss functions (WGAN-GP gradient penalty)
 │   ├── metrics.py      — evaluation metrics
 │   └── callbacks.py    — ECGVisualizationCallback, GeneratedSamplesCallback
+├── f/
+│   └── upload_hf.py    — upload_hf(), upload_hf_single()
 └── utils/
     ├── io.py           — read_yaml / write_yaml / write_json
     └── seed.py         — set_global_seed() (Python + NumPy + PyTorch)
