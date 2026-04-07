@@ -152,14 +152,16 @@ def _load_generator(
 
     state_dict = _remap_state_dict(state_dict)
 
-    # Detect whether the checkpoint includes the post-processing filter
-    has_ppfilter = any("post_proc_filter" in k for k in state_dict)
-    post_proc_filt_len = 512 if has_ppfilter else 0
+    # The original Pulse2Pulse repo defined ppfilter1 in __init__ but never
+    # called it in forward(), so its weights are random kaiming initialisation
+    # and were never updated by backprop.  Applying them at inference corrupts
+    # the output.  Drop the keys so the filter is not used.
+    state_dict = {k: v for k, v in state_dict.items() if "post_proc_filter" not in k}
 
     netG = WaveGANGenerator(
         model_size=model_size,
         num_channels=8,
-        post_proc_filt_len=post_proc_filt_len,
+        post_proc_filt_len=0,
         upsample=True,
     )
     netG.load_state_dict(state_dict, strict=True)
@@ -176,10 +178,13 @@ def generate(
     format: str = "csv",
     header: bool = True,
     ecgplot: bool = False,
+    plot_format: str = "png",
+    num_plot_samples: int = 4,
     model_size: int = 50,
     batch_size: int = 32,
     device: Optional[str] = None,
     seq_length: int = 5000,
+    denorm: float = 1.0,
 ) -> List[Path]:
     """Generate synthetic ECG signals from a trained Pulse2Pulse checkpoint.
 
@@ -199,13 +204,24 @@ def generate(
     output_dir:
         Directory where output files will be written (created if it doesn't exist).
     format:
-        Output format. Currently supports ``"csv"``.
+        Output format for signal data.  ``"csv"`` saves one file per sample;
+        ``"npy"`` saves all samples as a single ``generated_ecgs.npy`` array of
+        shape ``(n_samples, 8, 5000)``.
     header:
         When ``format="csv"``, include a header row with lead names
         (``I, II, V1, V2, V3, V4, V5, V6``). Default ``True``.
     ecgplot:
-        If ``True``, also save an ECG plot image (``.png``) for each sample
-        alongside the CSV. Requires ``pip install ecgplot``.
+        If ``True``, save ECG plots into a ``plots/`` sub-directory.
+
+        * ``plot_format="png"`` (default) — matplotlib PNG: one PNG per sample
+          plus a batch overview PNG.
+        * ``plot_format="html"`` — interactive D3 HTML, one file per sample.
+        * ``plot_format="svg"`` — static SVG, one file per sample.
+        * ``plot_format="pdf"`` — PDF via cairosvg, one file per sample
+          (requires ``pip install 'ecgen[plot]'``).
+    num_plot_samples:
+        When ``ecgplot=True`` and ``plot_format="png"``, number of individual
+        sample PNGs and the batch-overview plot (default 4).
     model_size:
         Generator ``model_size`` hyperparameter (default 50, matching PTB-XL checkpoint).
     batch_size:
@@ -214,13 +230,23 @@ def generate(
         ``"cpu"``, ``"cuda"``, or ``None`` (auto-detect, prefers GPU).
     seq_length:
         Length of each generated ECG signal in samples (default 5000).
+    denorm:
+        Multiply raw generator output by this factor before saving.
+        Default ``1.0`` (no scaling) — correct for the PTB-XL checkpoint, which
+        was trained with ``wfdb`` physical mV values (``norm_num=1.0``).
+        Use ``denorm=6000.0`` for models trained on ``ECGDataSimple``, which
+        normalises signals by dividing by 6000 before training.
 
     Returns
     -------
     List of ``Path`` objects pointing to the files that were created.
     """
-    if format not in ("csv",):
-        raise ValueError(f"Unsupported format '{format}'. Supported: 'csv'")
+    if format not in ("csv", "npy"):
+        raise ValueError(f"Unsupported format '{format}'. Supported: 'csv', 'npy'")
+    if ecgplot and plot_format not in ("png", "html", "svg", "pdf"):
+        raise ValueError(
+            f"Unsupported plot_format '{plot_format}'. Choose 'png', 'html', 'svg', or 'pdf'."
+        )
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -239,7 +265,6 @@ def generate(
     netG = _load_generator(local_path, model_size=model_size, device=_device)
 
     # Generate in batches
-    n_digits = len(str(n_samples))
     all_samples: List[np.ndarray] = []
 
     with torch.no_grad():
@@ -252,24 +277,76 @@ def generate(
             remaining -= bs
 
     ecg_array = np.concatenate(all_samples, axis=0)  # (n_samples, 8, 5000)
+    if denorm != 1.0:
+        ecg_array = ecg_array * denorm
     print(f"Generated {len(ecg_array)} ECG sample(s).")
 
-    # Save outputs
+    # Save signal outputs
     created: List[Path] = []
 
-    for idx, ecg in enumerate(ecg_array):
-        # ecg shape: (8, 5000)  — channels-first
-        sample_id = str(idx + 1).zfill(n_digits)
-
-        if format == "csv":
+    if format == "npy":
+        npy_path = output_dir / "generated_ecgs.npy"
+        np.save(npy_path, ecg_array)
+        created.append(npy_path)
+        print(f"Saved {ecg_array.shape[0]} ECGs to: {npy_path}")
+    else:  # csv
+        n_digits = len(str(n_samples))
+        for idx, ecg in enumerate(ecg_array):
+            sample_id = str(idx + 1).zfill(n_digits)
             csv_path = output_dir / f"sample_{sample_id}.csv"
             _save_csv(ecg, csv_path, header=header)
             created.append(csv_path)
 
-        if ecgplot:
-            png_path = output_dir / f"sample_{sample_id}.png"
-            _save_ecgplot(ecg, png_path)
-            created.append(png_path)
+    # Save plots
+    if ecgplot:
+        plots_dir = output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+
+        if plot_format == "png":
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from ecgen.plot import plot_generated_single, plot_generated_batch
+
+            n_plot = min(num_plot_samples, ecg_array.shape[0])
+            for idx in range(n_plot):
+                fig = plot_generated_single(
+                    ecg_array[idx],
+                    sampling_rate=seq_length // 10,  # 5000 samples → 500 Hz
+                    title=f"Generated sample {idx + 1}",
+                )
+                png_path = plots_dir / f"generated_sample_{idx:04d}.png"
+                fig.savefig(png_path, dpi=150)
+                plt.close(fig)
+                created.append(png_path)
+
+            fig_batch = plot_generated_batch(
+                ecg_array,
+                num_of_plots=n_plot,
+                sampling_rate=seq_length // 10,
+            )
+            batch_path = plots_dir / "generated_batch_overview.png"
+            fig_batch.savefig(batch_path, dpi=150)
+            plt.close(fig_batch)
+            created.append(batch_path)
+        else:
+            # D3/SVG/PDF — one file per sample
+            from ecgen.plot import plot_ecg
+            _ext = {"html": ".html", "svg": ".svg", "pdf": ".pdf"}[plot_format]
+            n_digits = len(str(n_samples))
+            for idx, ecg in enumerate(ecg_array):
+                sample_id = str(idx + 1).zfill(n_digits)
+                plot_path = plots_dir / f"sample_{sample_id}{_ext}"
+                plot_ecg(
+                    ecg,
+                    sample_rate=seq_length // 10,
+                    title=f"Sample {sample_id}",
+                    output_path=plot_path,
+                    format=plot_format,
+                )
+                created.append(plot_path)
+
+        print(f"Saved plots to: {plots_dir}")
 
     print(f"Saved {len(created)} file(s) to: {output_dir}")
     return created
@@ -297,20 +374,3 @@ def _save_csv(ecg: np.ndarray, path: Path, header: bool) -> None:
             writer.writerow([f"{v:.6f}" for v in row])
 
 
-def _save_ecgplot(ecg: np.ndarray, path: Path) -> None:
-    """Save an ECG plot image using the ecgplot library."""
-    try:
-        import ecgplot
-        import matplotlib
-        matplotlib.use("Agg")  # non-interactive backend
-        import matplotlib.pyplot as plt
-    except ImportError as e:
-        raise ImportError(
-            "ecgplot is required for plot output. Install with: pip install ecgplot"
-        ) from e
-
-    # ecgplot.plot expects shape (n_leads, n_samples)
-    fig, ax = plt.subplots(figsize=(20, 10))
-    ecgplot.plot(ecg, sample_rate=500, title=path.stem, columns=2, ax=ax)
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)

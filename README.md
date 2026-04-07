@@ -92,37 +92,73 @@ paths = generate(
 )
 # → outputs/generated/sample_01.csv … sample_10.csv
 
-# Local checkpoint
-paths = generate(
-    model_path="checkpoints/pulse2pulse_ptbxl_epoch900.pt",
-    n_samples=10,
-    output_dir="outputs/generated",
-)
-
-# Without headers
-generate(..., header=False)
-
-# With ECG plot images (requires: pip install 'ecgen[plot]')
+# With interactive D3 HTML plots alongside each CSV (default)
 generate(..., ecgplot=True)
-# → also saves sample_01.png … sample_10.png
+# → sample_01.csv + sample_01.html …
+
+# Static SVG plots
+generate(..., ecgplot=True, plot_format="svg")
+
+# PDF plots (requires: pip install 'ecgen[plot]')
+generate(..., ecgplot=True, plot_format="pdf")
 ```
-
-Each CSV has **5000 rows × 8 columns** (one row per time step, columns = `I, II, V1, V2, V3, V4, V5, V6`).
-
-**HF path format:** `hf://<owner>/<repo>/<path_in_repo>`  
-Files are cached in `~/.cache/huggingface/hub/` after the first download. Set `HF_TOKEN` in `.env` for private repos.
 
 | Parameter | Default | Description |
 |---|---|---|
 | `model_path` | — | Local `.pt` path **or** `hf://owner/repo/path` |
 | `n_samples` | — | Number of ECGs to generate |
 | `output_dir` | — | Output directory (created if absent) |
-| `format` | `"csv"` | Output format (`"csv"`) |
-| `header` | `True` | Include lead-name header row in CSV |
-| `ecgplot` | `False` | Also save `.png` ECG plot per sample |
+| `format` | `"csv"` | Signal output format |
+| `header` | `True` | Lead-name header row in CSV (`I,II,V1…V6`) |
+| `ecgplot` | `False` | Also save an ECG plot per sample |
+| `plot_format` | `"html"` | `"html"` · `"svg"` · `"pdf"` |
 | `model_size` | `50` | Generator `model_size` (must match training) |
 | `batch_size` | `32` | Samples per GPU forward pass |
-| `device` | auto | `"cuda"`, `"cpu"`, or `None` (auto) |
+| `device` | auto | `"cuda"`, `"cpu"`, or `None` |
+| `denorm` | `1.0` | Multiply raw output by this factor. Use `6000.0` for models trained on `ECGDataSimple` (÷6000 normalisation). Default `1.0` is correct for the PTB-XL checkpoint (physical mV, no normalisation). |
+
+---
+
+## ECG Plots
+
+`plot_ecg` renders any ECG array as a **real ECG graph-sheet** — pink/red grid paper, labelled leads, 25 mm/s paper speed, 10 mm/mV scale:
+
+```python
+from ecgen import plot_ecg
+import numpy as np
+
+ecg = np.load("my_ecg.npy")  # shape (8, 5000) or (5000, 8)
+
+# Interactive HTML — pan/zoom with mouse/touch, save-SVG and Print buttons
+plot_ecg(ecg, output_path="ecg.html", title="My ECG")
+
+# Static SVG — embed in documents, no JS required
+plot_ecg(ecg, output_path="ecg.svg", format="svg")
+
+# PDF (requires: pip install 'ecgen[plot]')
+plot_ecg(ecg, output_path="ecg.pdf", format="pdf")
+
+# Return content string instead of writing a file
+html_str = plot_ecg(ecg)
+svg_str  = plot_ecg(ecg, format="svg")
+```
+
+The interactive HTML uses **D3 v7** and is fully self-contained (single file). Features:
+- Scroll / pinch to zoom (x-axis); drag to pan
+- ECG grid scales with zoom so the mm² boxes always represent the same time/amplitude
+- **⤓ SVG** button exports the current view as a clean SVG file
+- **🖨 Print / PDF** button opens the browser print dialog (set destination to "Save as PDF")
+
+| Parameter | Default | Description |
+|---|---|---|
+| `ecg` | — | `(n_leads, n_samples)` or `(n_samples, n_leads)` |
+| `sample_rate` | `500` | Hz |
+| `lead_names` | auto | Defaults to `["I","II","V1"…"V6"]` |
+| `title` | `"ECG"` | Shown in toolbar and file header |
+| `output_path` | `None` | Write to file; `None` returns the content string |
+| `format` | `"html"` | `"html"` · `"svg"` · `"pdf"` |
+| `paper_speed` | `25.0` | mm/s |
+| `amplitude_scale` | `10.0` | mm/mV |
 
 ---
 
