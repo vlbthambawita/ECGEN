@@ -1,0 +1,31 @@
+# HuggingFace checkpoint upload configuration
+# Repository: https://huggingface.co/{hf_username}/ECGEN
+
+hf_repo_id: "ECGEN"          # HuggingFace repo name (username/ECGEN or org/ECGEN)
+hf_repo_type: "model"        # "model", "dataset", or "space"
+commit_message: "Upload model checkpoints"
+private: false               # Set to true to make the repo private on creation
+
+# List of checkpoints to upload.
+# Each entry:
+#   local_path  - absolute or relative path to file or directory on disk
+#   repo_path   - destination path inside the HF repo (supports subcategories)
+#   description - optional human-readable note (not uploaded, just for reference)
+
+checkpoints:
+  - local_path: "/work/vajira/DL2026/ECGEN/runs/pulse2pulse/ptbxl/best_model.ckpt"
+    repo_path: "pulse2pulse/ptbxl/best_model.ckpt"
+    description: "Pulse2Pulse best checkpoint trained on PTB-XL"
+
+  - local_path: "/work/vajira/DL2026/ECGEN/runs/pulse2pulse/mimic/best_model.ckpt"
+    repo_path: "pulse2pulse/mimic/best_model.ckpt"
+    description: "Pulse2Pulse best checkpoint trained on MIMIC"
+
+  - local_path: "/work/vajira/DL2026/ECGEN/runs/vae/ptbxl/checkpoint_epoch100.ckpt"
+    repo_path: "vae/ptbxl/checkpoint_epoch100.ckpt"
+    description: "VAE checkpoint epoch 100 on PTB-XL"
+
+  # Directory upload example — uploads the entire directory recursively
+  # - local_path: "/work/vajira/DL2026/ECGEN/runs/vae/mimic"
+  #   repo_path: "vae/mimic"
+  #   description: "All VAE MIMIC checkpoints"

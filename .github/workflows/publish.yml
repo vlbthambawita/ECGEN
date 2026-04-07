@@ -1,0 +1,46 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"   # triggers on tags like v0.1.0, v1.2.3, etc.
+
+jobs:
+  build-and-publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi          # optional: use a GitHub environment for extra protection
+    permissions:
+      id-token: write          # required for trusted publishing (no API token needed)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Update __version__ to match git tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"           # e.g. v0.2.1
+          VERSION="${TAG#v}"                  # strip leading 'v' -> 0.2.1
+          sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/ecgen/__init__.py
+          echo "Building version ${VERSION}"
+
+      - name: Install build tools
+        run: pip install --upgrade build
+
+      - name: Build distribution
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Uses PyPI Trusted Publishing — no PYPI_API_TOKEN secret required.
+        # Set up once at: https://pypi.org/manage/account/publishing/
+        # Publisher settings:
+        #   PyPI project name : ecgen
+        #   GitHub owner      : <your GitHub username or org>
+        #   Repository name   : ECGEN
+        #   Workflow filename : publish.yml
+        #   Environment name  : pypi  (optional but recommended)
