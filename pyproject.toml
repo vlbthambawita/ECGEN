@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-hf = ["huggingface_hub>=0.20"]
+hf = ["huggingface_hub>=0.20", "python-dotenv>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/vlbthambawita/ECGEN"

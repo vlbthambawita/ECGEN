@@ -21,6 +21,11 @@ dist/
 .vscode/
 .idea/
 
+# Secrets
+.env
+.env.*
+!.env.example
+
 # Misc
 *.log
 

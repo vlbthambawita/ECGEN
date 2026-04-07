@@ -13,17 +13,11 @@ private: false               # Set to true to make the repo private on creation
 #   description - optional human-readable note (not uploaded, just for reference)
 
 checkpoints:
-  - local_path: "/work/vajira/DL2026/ECGEN/runs/pulse2pulse/ptbxl/best_model.ckpt"
-    repo_path: "pulse2pulse/ptbxl/best_model.ckpt"
-    description: "Pulse2Pulse best checkpoint trained on PTB-XL"
+  - local_path: "/work/vajira/DL2026/Pulse2Pulse/output/pulse2pulse_exp_ptbxl_full/checkpoints/pulse2pulse_exp_ptbxl_full_epoch:900.pt"
+    repo_path: "pulse2pulse/ptbxl/pulse2pulse_exp_ptbxl_full_epoch:900.pt"
+    description: "Pulse2Pulse checkpoint from epoch 900 on PTB-XL"
 
-  - local_path: "/work/vajira/DL2026/ECGEN/runs/pulse2pulse/mimic/best_model.ckpt"
-    repo_path: "pulse2pulse/mimic/best_model.ckpt"
-    description: "Pulse2Pulse best checkpoint trained on MIMIC"
-
-  - local_path: "/work/vajira/DL2026/ECGEN/runs/vae/ptbxl/checkpoint_epoch100.ckpt"
-    repo_path: "vae/ptbxl/checkpoint_epoch100.ckpt"
-    description: "VAE checkpoint epoch 100 on PTB-XL"
+ 
 
   # Directory upload example — uploads the entire directory recursively
   # - local_path: "/work/vajira/DL2026/ECGEN/runs/vae/mimic"

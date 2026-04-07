@@ -171,7 +171,8 @@ class TestUploadHfMocked(unittest.TestCase):
 
         self.assertEqual(result, {"success": 1, "skipped": 0, "failed": 0})
         mock_create_repo.assert_called_once_with(
-            repo_id="testuser/ECGEN", repo_type="model", private=False, exist_ok=True
+            repo_id="testuser/ECGEN", repo_type="model", private=False, exist_ok=True,
+            token=None
         )
         mock_api.upload_file.assert_called_once()
         kw = mock_api.upload_file.call_args.kwargs
@@ -276,7 +277,8 @@ class TestUploadHfMocked(unittest.TestCase):
                 "checkpoints": [{"local_path": str(ckpt), "repo_path": "vae/best.ckpt"}],
             })
         mock_create_repo.assert_called_once_with(
-            repo_id="testuser/ECGEN", repo_type="model", private=True, exist_ok=True
+            repo_id="testuser/ECGEN", repo_type="model", private=True, exist_ok=True,
+            token=None
         )
 
     @patch.object(_MOD, "_HF_AVAILABLE", True)
@@ -306,7 +308,8 @@ class TestUploadHfMocked(unittest.TestCase):
                 "checkpoints": [{"local_path": str(ckpt), "repo_path": "vae/best.ckpt"}],
             })
         mock_create_repo.assert_called_once_with(
-            repo_id="testuser/ECGEN", repo_type="dataset", private=False, exist_ok=True
+            repo_id="testuser/ECGEN", repo_type="dataset", private=False, exist_ok=True,
+            token=None
         )
 
 
@@ -356,7 +359,8 @@ class TestUploadHfSingle(unittest.TestCase):
                 private=True,
             )
         mock_create_repo.assert_called_once_with(
-            repo_id="testuser/ECGEN", repo_type="dataset", private=True, exist_ok=True
+            repo_id="testuser/ECGEN", repo_type="dataset", private=True, exist_ok=True,
+            token=None
         )
 
 

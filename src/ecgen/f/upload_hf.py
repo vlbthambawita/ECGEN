@@ -19,8 +19,9 @@ Programmatic API:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import List, TypedDict, Union
+from typing import List, Optional, TypedDict, Union
 
 import yaml
 
@@ -33,6 +34,55 @@ except ImportError:
     HfApi = None       # type: ignore[assignment,misc]
     create_repo = None  # type: ignore[assignment]
     _HF_AVAILABLE = False
+
+
+def _load_token(env_file: Optional[Union[str, Path]] = None) -> Optional[str]:
+    """Load HF_TOKEN from a .env file or the environment.
+
+    Resolution order:
+      1. ``env_file`` argument (explicit path)
+      2. ``HF_ENV_FILE`` environment variable (path to a .env file)
+      3. ``.env`` in the current working directory
+      4. ``HF_TOKEN`` already set in the environment (no file needed)
+
+    Returns the token string, or None if not found.
+    """
+    # Determine which .env file to try
+    candidate: Optional[Path] = None
+    if env_file is not None:
+        candidate = Path(env_file)
+    elif os.environ.get("HF_ENV_FILE"):
+        candidate = Path(os.environ["HF_ENV_FILE"])
+    else:
+        default = Path.cwd() / ".env"
+        if default.exists():
+            candidate = default
+
+    if candidate is not None:
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(candidate, override=False)  # don't overwrite already-set vars
+        except ImportError:
+            # dotenv not installed — fall back to manual parse
+            _parse_env_file(candidate)
+
+    return os.environ.get("HF_TOKEN")
+
+
+def _parse_env_file(path: Path) -> None:
+    """Minimal .env parser used when python-dotenv is not installed."""
+    try:
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("'\"")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError:
+        pass
 
 
 class CheckpointEntry(TypedDict, total=False):
@@ -58,6 +108,7 @@ def upload_hf(
     config: Union[str, Path, dict],
     *,
     dry_run: bool = False,
+    env_file: Optional[Union[str, Path]] = None,
 ) -> dict:
     """Upload model checkpoints to a HuggingFace repository.
 
@@ -72,9 +123,15 @@ def upload_hf(
             hf_repo_type (str)  — "model" (default), "dataset", or "space"
             commit_message (str)
             private (bool)      — default False
+            env_file (str)      — path to .env file containing HF_TOKEN (can also be set
+                                  here instead of via the ``env_file`` argument)
     dry_run:
         Print what would be uploaded without actually uploading.
         Does not require ``huggingface_hub`` to be installed.
+    env_file:
+        Path to a .env file that contains ``HF_TOKEN=hf_...``.
+        Falls back to ``HF_ENV_FILE`` env var, then ``.env`` in CWD, then
+        ``HF_TOKEN`` already present in the environment.
 
     Returns
     -------
@@ -88,6 +145,10 @@ def upload_hf(
     """
     if isinstance(config, (str, Path)):
         config = _load_config(config)
+
+    # Token resolution: argument > config key > .env file > environment
+    resolved_env_file = env_file or config.get("env_file")
+    token: Optional[str] = _load_token(resolved_env_file)
 
     repo_id: str = config.get("hf_repo_id", "")
     if not repo_id:
@@ -116,10 +177,11 @@ def upload_hf(
         )
 
     if not dry_run:
-        api = HfApi()
+        api = HfApi(token=token)
         print(f"Creating/verifying repository '{repo_id}' ({repo_type}, private={private}) ...")
         try:
-            create_repo(repo_id=repo_id, repo_type=repo_type, private=private, exist_ok=True)
+            create_repo(repo_id=repo_id, repo_type=repo_type, private=private, exist_ok=True,
+                        token=token)
             print(f"  Repository ready: https://huggingface.co/{repo_id}")
         except Exception as e:
             raise RuntimeError(
@@ -199,6 +261,7 @@ def upload_hf_single(
     commit_message: str = "Upload checkpoint",
     private: bool = False,
     dry_run: bool = False,
+    env_file: Optional[Union[str, Path]] = None,
 ) -> dict:
     """Upload a single checkpoint file or directory to HuggingFace.
 
@@ -220,6 +283,8 @@ def upload_hf_single(
         Create the repo as private if it does not yet exist.
     dry_run:
         Preview without uploading.
+    env_file:
+        Path to a .env file containing ``HF_TOKEN=hf_...``.
 
     Returns
     -------
@@ -234,4 +299,4 @@ def upload_hf_single(
             {"local_path": str(local_path), "repo_path": repo_path}
         ],
     }
-    return upload_hf(config, dry_run=dry_run)
+    return upload_hf(config, dry_run=dry_run, env_file=env_file)
