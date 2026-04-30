@@ -15,18 +15,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # setuptools-scm needs full history + tags to derive the version
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
-      - name: Update __version__ to match git tag
-        run: |
-          TAG="${GITHUB_REF_NAME}"           # e.g. v0.2.1
-          VERSION="${TAG#v}"                  # strip leading 'v' -> 0.2.1
-          sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/ecgen/__init__.py
-          echo "Building version ${VERSION}"
 
       - name: Install build tools
         run: pip install --upgrade build
