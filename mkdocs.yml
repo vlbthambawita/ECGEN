@@ -1,6 +1,6 @@
 site_name: ECGEN
 site_description: ECG generation with VAE, VQ-VAE, GAN, Diffusion and State Space Models
-site_url: https://vlbthambawita.github.io/ECGEN/
+site_url: https://vajira.info/ECGEN/
 repo_url: https://github.com/vlbthambawita/ECGEN
 repo_name: vlbthambawita/ECGEN
 edit_uri: edit/main/docs/
