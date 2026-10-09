@@ -41,3 +41,6 @@ test_output/
 *.log
 .DS_Store
 
+
+# MkDocs build output
+site/

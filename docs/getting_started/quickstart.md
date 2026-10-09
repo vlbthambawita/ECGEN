@@ -1,174 +1,91 @@
-# VAE Training - Quick Reference
+# Quick Start
 
-## One-Line Quick Start
+This page gets a VAE training on MIMIC-IV-ECG with the config-driven workflow. For the other model
+families see [VQ-VAE training](../training/vqvae_training.md) and
+[Pulse2Pulse training](../training/pulse2pulse_training.md).
+
+## 1. Install
 
 ```bash
-# Quick test (5 minutes)
-bash scripts/run_train_vae_mimic_quick.sh /path/to/mimic-iv-ecg
-
-# Full training
-bash scripts/run_train_vae_mimic.sh /path/to/mimic-iv-ecg
+pip install -e .
+export PYTHONPATH="$PWD/src:$PYTHONPATH"   # train_vae_mimic.py still imports the legacy ecgen package
 ```
 
-## Files Created
+See [Installation](installation.md) for details.
 
-| File | Purpose |
-|------|---------|
-| `scripts/train_vae_mimic.py` | Main Python training script |
-| `scripts/run_train_vae_mimic.sh` | Shell wrapper (production) |
-| `scripts/run_train_vae_mimic_quick.sh` | Quick test script |
-| `configs/experiments/vae_mimic.yaml` | YAML configuration |
-| `scripts/README_VAE_MIMIC.md` | Full documentation |
+## 2. Point the config at your data
 
-## Three Ways to Train
+Edit [`configs/experiments/vae_mimic.yaml`](https://github.com/vlbthambawita/ECGEN/blob/main/configs/experiments/vae_mimic.yaml):
 
-### 1. Quick Test (Recommended First)
+```yaml
+data:
+  params:
+    mimic_path: /path/to/mimic-iv-ecg   # directory containing machine_measurements.csv and files/
+    max_samples: 1000                   # small value for a smoke run; null for the full dataset
+```
+
+For a short run also lower `trainer.max_epochs`.
+
+## 3. Train
+
 ```bash
-bash scripts/run_train_vae_mimic_quick.sh /path/to/data
-```
-- 1000 samples
-- 10 epochs
-- ~5 minutes
-
-### 2. Shell Wrapper (Easy)
-```bash
-bash scripts/run_train_vae_mimic.sh /path/to/data
-```
-- 10k samples
-- 100 epochs
-- Default settings
-
-### 3. Python Script (Full Control)
-```bash
-python scripts/train_vae_mimic.py \
-    --data-dir /path/to/data \
-    --exp-name my_experiment \
-    --batch-size 32 \
-    --max-epochs 100
+./scripts/shell/run_train_vae_mimic_config.sh                        # uses configs/experiments/vae_mimic.yaml
+./scripts/shell/run_train_vae_mimic_config.sh configs/experiments/my_vae.yaml
+# or directly
+python scripts/train/train_vae_mimic.py --config configs/experiments/vae_mimic.yaml
 ```
 
-## Common Commands
+The shell wrapper `cd`s to the repo root and calls `scripts/train/train_vae_mimic.py --config <yaml>`.
 
-### Monitor Training
+!!! info "W&B is on by default"
+    `vae_mimic.yaml` ships with `wandb.enabled: true` and `visualization.log_to_wandb: true`.
+    Set `wandb.enabled: false` if you do not have `wandb` installed/configured.
+
+## 4. Monitor
+
 ```bash
 tensorboard --logdir runs/vae_mimic/seed_42/tb
+ls runs/vae_mimic/seed_42/samples/      # epoch_NNNN.png reconstruction plots
 ```
 
-### Check Checkpoints
-```bash
-ls -lh runs/vae_mimic/seed_42/checkpoints/
+!!! tip
+    With the shipped `vae_mimic.yaml` (`trainer.check_val_every_n_epoch: 5`,
+    `visualization.every_n_epochs: 5`) the plot and validation epochs never coincide, so no images
+    are written. Set `visualization.every_n_epochs: 1` to get a plot after every validation run.
+    See [Visualization](../visualization/guide.md).
+
+Outputs of `train_vae_mimic.py`:
+
+```
+runs/<experiment.name>/seed_<seed>/
+├── checkpoints/   # epochNNN-stepNNNNNN.ckpt (top-3 by val_loss) + last.ckpt
+├── samples/       # reconstruction plots from VAEVisualizationCallback
+└── tb/            # TensorBoard logs
 ```
 
-### Load Trained Model
+## 5. Use the trained model
+
 ```python
-from ecgen.models.vae import VAELightning
-model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt")
+import torch
+from models.vae import VAELightning, VAEConfig
+
+ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
+model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
+model.load_state_dict(ckpt["state_dict"])
+model.eval()
+
+samples = model.sample(n_samples=16, seq_length=5000)   # (16, 12, 5000)
 ```
 
-### Generate Samples
-```python
-samples = model.sample(n_samples=16, seq_length=5000)
-```
+!!! warning
+    `VAELightning.load_from_checkpoint(path)` without arguments fails, because the module takes a
+    single `config` argument while the checkpoint stores the flattened config fields as
+    hyper-parameters. Either rebuild the config as above or pass it explicitly:
+    `VAELightning.load_from_checkpoint(path, config=VAEConfig())`.
 
-## Key Arguments
+## Next steps
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--data-dir` | Required | Path to MIMIC-IV-ECG |
-| `--exp-name` | vae_mimic | Experiment name |
-| `--batch-size` | 32 | Batch size |
-| `--max-epochs` | 100 | Training epochs |
-| `--base-channels` | 64 | Model size |
-| `--latent-channels` | 8 | Latent dimensions |
-| `--lr` | 0.0001 | Learning rate |
-| `--kl-weight` | 0.0001 | KL weight |
-
-## Quick Examples
-
-### Small Model (Fast)
-```bash
-python scripts/train_vae_mimic.py \
-    --data-dir /path/to/data \
-    --base-channels 32 \
-    --batch-size 64 \
-    --max-epochs 50
-```
-
-### Large Model (Quality)
-```bash
-python scripts/train_vae_mimic.py \
-    --data-dir /path/to/data \
-    --base-channels 128 \
-    --batch-size 16 \
-    --max-epochs 200
-```
-
-### With W&B
-```bash
-python scripts/train_vae_mimic.py \
-    --data-dir /path/to/data \
-    --wandb \
-    --wandb-project my-project
-```
-
-### Resume
-```bash
-python scripts/train_vae_mimic.py \
-    --data-dir /path/to/data \
-    --resume runs/vae_mimic/seed_42/checkpoints/last.ckpt
-```
-
-## Output Structure
-
-```
-runs/vae_mimic/seed_42/
-├── checkpoints/
-│   ├── epoch000-step000000.ckpt
-│   └── last.ckpt
-├── samples/
-└── tb/
-    └── version_0/
-```
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Data not found | Update path in script or pass as argument |
-| Out of memory | Reduce `--batch-size` or `--base-channels` |
-| Import error | Script auto-handles, or set PYTHONPATH |
-| Slow training | Increase `--num-workers` or use multi-GPU |
-
-## Performance
-
-| Configuration | Time (V100) | Parameters |
-|---------------|-------------|------------|
-| Quick test | ~5 min | ~1.5M |
-| Default | ~3-4 hours | ~6.2M |
-| Full dataset | ~1-2 days | ~6.2M |
-| Large model | ~2-3 days | ~25M |
-
-## Expected Losses
-
-- Reconstruction: 0.1 - 0.3
-- KL divergence: 0.01 - 0.05
-- Total: 0.1 - 0.35
-
-## Documentation
-
-- Full guide: `VAE_MIMIC_TRAINING.md`
-- Detailed docs: `scripts/README_VAE_MIMIC.md`
-- Model docs: `docs/VAE_MODEL.md`
-- Config: `configs/experiments/vae_mimic.yaml`
-
-## Similar to Pulse2Pulse
-
-```bash
-# Pulse2Pulse
-bash scripts/run_train_pulse2pulse_mimic.sh
-
-# VAE (same style!)
-bash scripts/run_train_vae_mimic.sh
-```
-
-Same pattern, same simplicity!
+- [Configuration](configuration.md) — which YAML keys the scripts actually read
+- [VAE model](../models/vae.md) and [architecture overview](../models/architecture.md)
+- [VAE training guide](../training/vae_training.md)
+- [Visualization](../visualization/guide.md)

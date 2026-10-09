@@ -1,363 +1,175 @@
-# ECGEN Project Structure
+# Project Structure
 
-## Overview
+ECGEN is installed as the `ecgen` distribution (`pip install -e .`), which provides six **top-level**
+packages: `models`, `data`, `training`, `evaluation`, `utils`, `visualization`. A legacy package under
+`src/ecgen/` still exists and is used by a few scripts (see [below](#legacy-srcecgen)).
 
-This document describes the logical organization of the ECGEN project.
-
----
-
-## Directory Structure
+## Directory layout
 
 ```
-DL2026/ECGEN/
+ECGEN/
+├── models/                         # Model architectures
+│   ├── components/                 # Shared blocks
+│   │   ├── blocks.py               #   ResidualBlock1D
+│   │   ├── encoders.py             #   Encoder1D
+│   │   └── decoders.py             #   Decoder1D
+│   ├── vae/                        # VAE
+│   │   ├── config.py               #   VAEConfig
+│   │   ├── vae_1d.py               #   VAE1D
+│   │   └── vae_lightning.py        #   VAELightning
+│   ├── vqvae/                      # VQ-VAE + PixelCNN prior
+│   │   ├── config.py               #   VQVAEConfig, PriorConfig
+│   │   ├── vector_quantizer.py     #   VectorQuantizer
+│   │   ├── vqvae_1d.py             #   VQVAE1D
+│   │   ├── vqvae_lightning.py      #   VQVAELightning (stage 1)
+│   │   ├── pixelcnn_prior.py       #   GatedMaskedConv1d, PixelCNNPrior
+│   │   └── prior_lightning.py      #   PriorLightning (stage 2)
+│   ├── gan/
+│   │   └── pulse2pulse.py          #   WaveGANGenerator, WaveGANDiscriminator, Pulse2PulseConfig, Pulse2PulseGAN
+│   ├── diffusion/                  # placeholder
+│   └── ssm/                        # placeholder
 │
-├── src/ecgen/                          # Main package (installable)
-│   ├── __init__.py
-│   │
-│   ├── data/                           # Data loading and preprocessing
-│   │   ├── __init__.py
-│   │   ├── mimic_dataset.py           # MIMIC-IV-ECG dataset
-│   │   └── transforms.py              # Data transformations
-│   │
-│   ├── models/                         # Model architectures
-│   │   ├── __init__.py
-│   │   ├── vae.py                     # VAE model
-│   │   ├── pulse2pulse.py             # Pulse2Pulse GAN
-│   │   └── components.py              # Shared components
-│   │
-│   ├── training/                       # Training utilities ⭐
-│   │   ├── __init__.py                # Exports all callbacks
-│   │   ├── callbacks.py               # ALL CALLBACKS (422 lines)
-│   │   │   ├── ECGVisualizationCallback
-│   │   │   ├── GeneratedSamplesCallback
-│   │   │   └── VAEVisualizationCallback
-│   │   ├── losses.py                  # Loss functions
-│   │   ├── metrics.py                 # Evaluation metrics
-│   │   ├── train.py                   # Training loops
-│   │   ├── test.py                    # Testing utilities
-│   │   └── validate.py                # Validation utilities
-│   │
-│   ├── evaluation/                     # Evaluation tools
-│   │   ├── __init__.py
-│   │   └── metrics.py
-│   │
-│   └── utils/                          # Utility functions
-│       ├── __init__.py
-│       ├── seed.py                    # Random seed utilities
-│       └── visualization.py           # General visualization
+├── data/
+│   └── datasets/
+│       ├── base.py                 # BaseECGDataset (abstract)
+│       └── mimic/
+│           ├── dataset.py          # MIMICIVECGDataset
+│           ├── datamodule.py       # ECGDataModule (minimal dataclass, not a LightningDataModule)
+│           └── pulse2pulse_datamodule.py   # imports the legacy ecgen dataset
 │
-├── scripts/                            # Executable scripts
-│   ├── train_vae_mimic.py             # VAE training script
-│   ├── train_pulse2pulse.py           # Pulse2Pulse training
-│   ├── generate_pulse2pulse.py        # Sample generation
-│   ├── run_train_vae_mimic_config.sh  # Shell wrapper for VAE
-│   ├── run_train_pulse2pulse_mimic.sh # Shell wrapper for P2P
-│   └── README_VISUALIZATION.md        # Quick reference
+├── training/
+│   ├── callbacks/
+│   │   ├── visualization.py        # ECGVisualizationCallback, GeneratedSamplesCallback, VAEVisualizationCallback
+│   │   ├── checkpointing.py        # placeholder
+│   │   └── logging.py              # placeholder
+│   ├── losses/                     # vae_losses.py, vqvae_losses.py, gan_losses.py, common.py
+│   ├── metrics/                    # reconstruction.py, generation.py, clinical.py
+│   └── trainers/                   # gan_trainer.py (generic config trainer), base/vae placeholders
 │
-├── configs/                            # Configuration files
-│   ├── dataset/                       # Dataset configs
-│   ├── experiments/                   # Experiment configs
-│   │   └── vae_mimic.yaml            # VAE training config
-│   ├── model/                         # Model configs
-│   └── trainer/                       # Trainer configs
+├── evaluation/
+│   ├── metrics/                    # fidelity.py, diversity.py, signal_quality.py
+│   ├── benchmark.py                # ModelBenchmark
+│   └── visualize.py                # plot_evaluation_results, plot_comparison_matrix
 │
-├── docs/                               # Documentation
-│   ├── VAE_VISUALIZATION.md           # Visualization guide
-│   └── ...
+├── visualization/                  # ecg_plots.py, latent_space.py, training_curves.py
+├── utils/                          # seed.py, io.py, logging.py, metadata.py
 │
-├── tests/                              # Unit tests
-│   └── ...
+├── configs/
+│   ├── experiments/                # vae_mimic, vqvae_mimic, prior_mimic, pulse2pulse_mimic (.yaml)
+│   ├── model/                      # vae/, vqvae/, gan/, imn.yaml  (reference fragments, not loaded)
+│   ├── dataset/                    # mimic.yaml, ptbxl.yaml        (reference fragments, not loaded)
+│   └── training/                   # default.yaml (empty), fast_dev.yaml, production.yaml
 │
-├── runs/                               # Training outputs (gitignored)
-│   └── {experiment_name}/
-│       └── seed_{seed}/
-│           ├── checkpoints/           # Model checkpoints
-│           ├── samples/               # Visualization samples
-│           └── tb/                    # TensorBoard logs
+├── scripts/
+│   ├── train/                      # train_vae_mimic.py, train_vqvae_mimic.py, train_prior_mimic.py,
+│   │                               # train_pulse2pulse.py, train_template.py
+│   ├── shell/                      # run_train_*.sh wrappers, run_sweep.sh
+│   ├── generate/                   # generate_pulse2pulse.py, generate_vae.py (stub)
+│   ├── evaluate/                   # evaluate_model.py, benchmark_models.py
+│   ├── data/                       # prepare_mimic.py, validate_dataset.py (stubs)
+│   └── utils/                      # test_models_only.py, test_pulse2pulse_setup.py
 │
-├── REORGANIZATION_SUMMARY.md          # This reorganization
-├── VISUALIZATION_SUMMARY.md           # Visualization feature
-├── CHANGES.md                         # Detailed changes
-├── README_VAE_VISUALIZATION.md        # Main README
-├── PROJECT_STRUCTURE.md               # This file
-│
-├── setup.py                           # Package installation
-├── requirements.txt                   # Dependencies
-└── README.md                          # Project README
+├── single_file/                    # self-contained VQ-VAE: train_vqvae_standalone.py, run_train_vqvae.sh
+├── src/ecgen/                      # legacy package (not installed)
+├── tests/                          # test_models/, test_data/, test_training/
+├── docs/                           # this documentation (MkDocs)
+├── runs/                           # training outputs (git-ignored)
+└── pyproject.toml
 ```
 
----
+## Module responsibilities
 
-## Module Responsibilities
+| Package | Contents |
+|---------|----------|
+| `models` | `nn.Module`s and their `LightningModule` wrappers; one sub-package per family. See [Architecture](models/architecture.md). |
+| `data` | Datasets. `MIMICIVECGDataset` reads WFDB records, does a seeded subject-level train/val/test split, and returns `(ecg, features)` where `ecg` is `(num_leads, seq_length)` (default 12 × 5000) and `features` are 9 normalised machine measurements. See [MIMIC-IV-ECG](datasets/mimic.md) and [Custom datasets](datasets/custom.md). |
+| `training` | Callbacks, losses, training-time metrics, trainers. See [Training guide](training/guide.md). |
+| `evaluation` | Metrics and benchmarking for generated ECGs. See [Evaluation metrics](evaluation/metrics.md). |
+| `visualization` | Matplotlib helpers for ECGs, latents and curves. See [Visualization](visualization/guide.md). |
+| `utils` | `set_global_seed`, YAML/JSON I/O (`read_yaml`, `write_yaml`, `write_json`), `get_logger`, `collect_run_metadata`. |
 
-### 📦 src/ecgen/ (Package)
-
-The main Python package containing all reusable code.
-
-#### data/
-- Dataset classes (MIMIC-IV-ECG, etc.)
-- Data loading and preprocessing
-- Transforms and augmentations
-
-#### models/
-- Model architectures (VAE, Pulse2Pulse, etc.)
-- Model components (encoders, decoders, etc.)
-- Model configurations
-
-#### training/ ⭐
-- **callbacks.py** - All training callbacks
-  - `ECGVisualizationCallback` - Visualize GAN outputs
-  - `GeneratedSamplesCallback` - Save generated samples
-  - `VAEVisualizationCallback` - Visualize VAE reconstructions
-- **losses.py** - Loss functions
-- **metrics.py** - Evaluation metrics
-- **train.py** - Training loops
-- **test.py** - Testing utilities
-- **validate.py** - Validation utilities
-
-#### evaluation/
-- Evaluation metrics
-- Performance analysis tools
-
-#### utils/
-- Random seed management
-- General utilities
-- Helper functions
-
-### 📜 scripts/
-
-Executable scripts that use the package.
-
-- **Training scripts** - `train_*.py`
-- **Generation scripts** - `generate_*.py`
-- **Shell wrappers** - `run_*.sh`
-- **Documentation** - `README_*.md`
-
-### ⚙️ configs/
-
-YAML configuration files for experiments.
-
-- **dataset/** - Dataset configurations
-- **experiments/** - Full experiment configs
-- **model/** - Model hyperparameters
-- **trainer/** - Training parameters
-
-### 📚 docs/
-
-Project documentation.
-
-### 🧪 tests/
-
-Unit tests for the package.
-
-### 📊 runs/
-
-Training outputs (gitignored).
-
----
-
-## Import Patterns
-
-### ✅ Correct Imports
+## Import patterns
 
 ```python
-# Import callbacks from the package
-from ecgen.training.callbacks import VAEVisualizationCallback
-from ecgen.training.callbacks import ECGVisualizationCallback
-from ecgen.training.callbacks import GeneratedSamplesCallback
+from models.vae import VAE1D, VAELightning, VAEConfig
+from models.vqvae import VQVAELightning, PriorLightning, VQVAEConfig, PriorConfig
+from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig   # models.gan exports nothing
+from models.components import ResidualBlock1D, Encoder1D, Decoder1D
 
-# Or import all at once
-from ecgen.training.callbacks import (
-    VAEVisualizationCallback,
-    ECGVisualizationCallback,
-    GeneratedSamplesCallback,
-)
+from data.datasets.mimic.dataset import MIMICIVECGDataset   # or: from data.datasets.mimic import MIMICIVECGDataset
+from data.datasets.base import BaseECGDataset
 
-# Or use the training module __init__
-from ecgen.training import VAEVisualizationCallback
+from training.callbacks import VAEVisualizationCallback, ECGVisualizationCallback, GeneratedSamplesCallback
+from training.losses import vae_loss, vqvae_loss, prior_loss
 
-# Import models
-from ecgen.models.vae import VAE1D, VAEConfig
-
-# Import data
-from ecgen.data.mimic_dataset import MIMICIVECGDataset
+from visualization import plot_ecg_leads, plot_latent_space_2d
+from utils.seed import set_global_seed
 ```
 
-### ❌ Incorrect Imports (Old)
+The old `ecgen.*` imports (`from ecgen.models.vae import ...`, `from ecgen.training.callbacks import ...`)
+refer to the legacy package. See
+[`MIGRATION_GUIDE.md`](https://github.com/vlbthambawita/ECGEN/blob/main/MIGRATION_GUIDE.md) for the
+old → new mapping.
 
-```python
-# DON'T DO THIS - scripts/callbacks/ no longer exists
-from callbacks.vae_visualization import VAEVisualizationCallback
+## Legacy `src/ecgen/`
+
+`src/ecgen/` is not listed in `pyproject.toml`, so it is not installed, but these files still import
+it and need `PYTHONPATH=src`:
+
+- `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`)
+- `scripts/train/train_pulse2pulse.py`, `scripts/generate/generate_pulse2pulse.py`
+- `scripts/utils/test_models_only.py`
+- `training/trainers/gan_trainer.py`
+- `data/datasets/mimic/pulse2pulse_datamodule.py`
+- `tests/test_models/test_vae.py`
+- the `target:` strings in `configs/experiments/vae_mimic.yaml` and `pulse2pulse_mimic.yaml`
+
+## Run outputs
+
+```
+runs/<experiment.name>/seed_<seed>/
+├── checkpoints/          # epochNNN-stepNNNNNN.ckpt + last.ckpt
+├── samples/              # visualization PNGs
+├── tb/                   # TensorBoard logs
+├── config_resolved.yaml  # gan_trainer.py only
+└── metadata.json         # gan_trainer.py only (also creates metrics/ and preds/)
 ```
 
----
+## Quick reference
 
-## Callback Locations
-
-### All Callbacks in One Place
-
-**File**: `src/ecgen/training/callbacks.py` (422 lines)
-
-**Contains**:
-1. **ECGVisualizationCallback** (lines 20-97)
-   - For GAN models (Pulse2Pulse)
-   - Visualizes real vs generated ECG
-   - Used by: `train_pulse2pulse.py`
-
-2. **GeneratedSamplesCallback** (lines 99-168)
-   - Saves generated samples periodically
-   - Creates plots and saves tensors
-   - Used by: `train_pulse2pulse.py`
-
-3. **VAEVisualizationCallback** (lines 171-422)
-   - For VAE models
-   - Visualizes real vs reconstructed ECG
-   - Two modes: separate leads or overlay
-   - Used by: `train_vae_mimic.py`
-
----
-
-## Training Workflows
-
-### VAE Training
-
-```bash
-# 1. Configure
-nano configs/experiments/vae_mimic.yaml
-
-# 2. Train
-./scripts/run_train_vae_mimic_config.sh
-
-# 3. Monitor
-tensorboard --logdir runs/vae_mimic/seed_42/tb
-
-# 4. Check visualizations
-ls runs/vae_mimic/seed_42/samples/
-```
-
-**Uses**: `VAEVisualizationCallback`
-
-### Pulse2Pulse Training
-
-```bash
-# 1. Train
-./scripts/run_train_pulse2pulse_mimic.sh
-
-# 2. Monitor
-tensorboard --logdir runs/pulse2pulse/seed_42/tb
-```
-
-**Uses**: `ECGVisualizationCallback`, `GeneratedSamplesCallback`
-
----
-
-## Key Design Principles
-
-### 1. Separation of Concerns
-- **Package** (`src/ecgen/`) - Reusable code
-- **Scripts** (`scripts/`) - Executable entry points
-- **Configs** (`configs/`) - Experiment parameters
-
-### 2. Single Source of Truth
-- All callbacks in one file: `src/ecgen/training/callbacks.py`
-- No duplicate code
-- Easy to maintain
-
-### 3. Clean Imports
-- Standard Python package imports
-- No `sys.path` manipulation needed
-- IDE autocomplete works
-
-### 4. Logical Grouping
-- Training utilities together
-- Models together
-- Data loading together
-
----
-
-## Adding New Components
-
-### Adding a New Callback
-
-1. Open `src/ecgen/training/callbacks.py`
-2. Add your callback class
-3. Update `src/ecgen/training/__init__.py` to export it
-4. Use it in your training script:
-   ```python
-   from ecgen.training.callbacks import YourNewCallback
-   ```
-
-### Adding a New Model
-
-1. Create file in `src/ecgen/models/`
-2. Implement your model
-3. Import in training script:
-   ```python
-   from ecgen.models.your_model import YourModel
-   ```
-
-### Adding a New Dataset
-
-1. Create file in `src/ecgen/data/`
-2. Implement dataset class
-3. Import in training script:
-   ```python
-   from ecgen.data.your_dataset import YourDataset
-   ```
-
----
-
-## Benefits of This Structure
-
-### ✅ Maintainability
-- Clear organization
-- Easy to find code
-- Logical grouping
-
-### ✅ Reusability
-- Package can be installed
-- Code can be imported anywhere
-- Callbacks work in notebooks
-
-### ✅ Scalability
-- Easy to add new components
-- No naming conflicts
-- Clear dependencies
-
-### ✅ Best Practices
-- Follows Python conventions
-- Standard package structure
-- Professional organization
-
----
-
-## Quick Reference
-
-### Where is...?
+### Where is ...?
 
 | Component | Location |
 |-----------|----------|
-| Callbacks | `src/ecgen/training/callbacks.py` |
-| VAE model | `src/ecgen/models/vae.py` |
-| Pulse2Pulse model | `src/ecgen/models/pulse2pulse.py` |
-| MIMIC dataset | `src/ecgen/data/mimic_dataset.py` |
-| Training scripts | `scripts/train_*.py` |
-| Configs | `configs/experiments/*.yaml` |
-| Documentation | `docs/*.md` |
-| Outputs | `runs/{experiment}/seed_{seed}/` |
+| Shared conv blocks | `models/components/` |
+| VAE | `models/vae/` |
+| VQ-VAE and prior | `models/vqvae/` |
+| Pulse2Pulse | `models/gan/pulse2pulse.py` |
+| MIMIC dataset | `data/datasets/mimic/dataset.py` |
+| Callbacks | `training/callbacks/visualization.py` |
+| Losses | `training/losses/` |
+| Training scripts | `scripts/train/` (wrappers in `scripts/shell/`) |
+| Experiment configs | `configs/experiments/` |
+| Standalone VQ-VAE | `single_file/` |
 
-### How do I...?
+### How do I ...?
 
 | Task | Command |
 |------|---------|
-| Train VAE | `./scripts/run_train_vae_mimic_config.sh` |
-| Train Pulse2Pulse | `./scripts/run_train_pulse2pulse_mimic.sh` |
-| View TensorBoard | `tensorboard --logdir runs/{exp}/seed_{seed}/tb` |
-| Check visualizations | `ls runs/{exp}/seed_{seed}/samples/` |
-| Import callback | `from ecgen.training.callbacks import VAEVisualizationCallback` |
-| Edit config | `nano configs/experiments/vae_mimic.yaml` |
+| Train the VAE | `./scripts/shell/run_train_vae_mimic_config.sh [config]` |
+| Train the VQ-VAE (stage 1) | `./scripts/shell/run_train_vqvae_mimic.sh [config]` |
+| Train the prior (stage 2) | `./scripts/shell/run_train_vqvae_prior_mimic.sh <vqvae.ckpt> [config]` |
+| Train Pulse2Pulse | `./scripts/shell/run_train_pulse2pulse_standalone.sh` (see [Pulse2Pulse training](training/pulse2pulse_training.md)) |
+| View TensorBoard | `tensorboard --logdir runs/<exp>/seed_<seed>/tb` |
+| Check reconstruction plots | `ls runs/<exp>/seed_<seed>/samples/` |
+| Run tests | `pytest tests/` |
 
----
+## Adding new components
 
-**Last Updated**: 2026-02-27  
-**Status**: ✅ Organized and documented
+- **Model**: new sub-package under `models/` (config dataclass + `nn.Module` + LightningModule),
+  exported from its `__init__.py`. See [Architecture](models/architecture.md#adding-a-new-model).
+- **Dataset**: subclass `BaseECGDataset` in `data/datasets/<name>/`. See
+  [Custom datasets](datasets/custom.md).
+- **Callback**: add it to `training/callbacks/` and export it from `training/callbacks/__init__.py`.
+- **Training script**: copy `scripts/train/train_template.py` or a `train_*_mimic.py` script, and add a
+  wrapper under `scripts/shell/` and a config under `configs/experiments/`.

@@ -1,465 +1,171 @@
-# VAE Visualization Feature - Complete Implementation ✅
+# Visualization
 
-## Summary
+ECGEN has two visualization pieces:
 
-Successfully implemented a comprehensive visualization system to monitor VAE reconstruction quality during training. The system automatically generates comparison plots of real vs reconstructed ECG signals.
+1. **During training** — `VAEVisualizationCallback` (in `training/callbacks/visualization.py`) saves
+   real-vs-reconstruction plots for the VAE and VQ-VAE.
+2. **Offline** — the `visualization` package (`visualization/ecg_plots.py`, `latent_space.py`,
+   `training_curves.py`) with plotting helpers that return matplotlib figures.
 
----
+GAN-specific callbacks (`ECGVisualizationCallback`, `GeneratedSamplesCallback`) are described in
+[Callbacks](../training/callbacks.md).
 
-## What's New
+## Reconstruction plots during training
 
-### 🎨 Automatic ECG Visualization
-- Real vs reconstructed ECG comparison plots
-- Generated automatically during training
-- Two visualization modes (separate leads / overlay)
-- Saves to disk, TensorBoard, and optionally W&B
+`train_vae_mimic.py` and `train_vqvae_mimic.py` add a `VAEVisualizationCallback` automatically,
+configured from the `visualization:` section of the experiment YAML:
 
-### 📊 Flexible Configuration
-- Configure via YAML config file
-- Override with command-line arguments
-- Sensible defaults (visualize every 5 epochs)
-
-### 📚 Complete Documentation
-- User guide with examples
-- Quick reference card
-- Troubleshooting section
-
----
-
-## Quick Start
-
-### 1. Train with Visualization (Default Settings)
-```bash
-./scripts/run_train_vae_mimic_config.sh
+```yaml
+visualization:
+  every_n_epochs: 5         # plot every N epochs (only on epochs where validation runs)
+  num_samples: 4            # ECGs per plot, taken from the first validation batch
+  plot_all_leads: true      # true: one subplot per lead; false: all leads overlaid
+  log_to_tensorboard: false
+  log_to_wandb: true        # also needs wandb.enabled: true
 ```
 
-This will:
-- Train your VAE model
-- Generate visualizations every 5 epochs
-- Save plots to `runs/vae_mimic/seed_42/samples/`
-- Log to TensorBoard
+or, without a config, with `--viz-every-n-epochs`, `--viz-num-samples`, `--viz-plot-all-leads` and
+`--viz-log-to-wandb` (`--viz-log-to-tensorboard` defaults to on). As with every key, values in the
+YAML override these flags. The prior script (`train_prior_mimic.py`) has no visualization.
 
-### 2. View Visualizations in TensorBoard
+!!! warning "Plots appear only on validation epochs"
+    The callback runs in `on_validation_epoch_end`, skips the sanity check, and fires when
+    `current_epoch % every_n_epochs == 0` (0-based epochs). Lightning validates when
+    `(current_epoch + 1) % check_val_every_n_epoch == 0`, i.e. on epochs 4, 9, 14, ... for
+    `check_val_every_n_epoch: 5`. A plot is produced only on epochs that satisfy both conditions —
+    in particular, the shipped
+    `vae_mimic.yaml` (`check_val_every_n_epoch: 5`, `every_n_epochs: 5`) **never** produces a plot.
+    Use `every_n_epochs: 1` (as `vqvae_mimic.yaml` does) to plot on every validation epoch.
+
+### Plot layouts
+
+**`plot_all_leads: true`** — a grid with `2 × num_samples` rows and one column per lead: for each
+sample a "Real" row (blue) above a "Recon" row (orange). Columns are titled with the standard lead
+names `I, II, III, aVR, aVL, aVF, V1–V6`.
+
+**`plot_all_leads: false`** — `num_samples` rows × 2 columns ("Real" and "Reconstructed"), with all
+leads overlaid in each panel and a lead legend on the first row.
+
+Both figures are titled `VAE Reconstruction - Epoch N` (also for the VQ-VAE).
+
+### Where the plots go
+
+| Destination | Location |
+|-------------|----------|
+| Disk | `runs/<exp_name>/seed_<seed>/samples/epoch_{epoch:04d}.png` (150 dpi) |
+| TensorBoard | Images tab, tag `vae_reconstruction` (when `log_to_tensorboard` is on) |
+| Weights & Biases | key `vae_reconstruction` (when `log_to_wandb` is on and a `WandbLogger` exists) |
+
 ```bash
 tensorboard --logdir runs/vae_mimic/seed_42/tb
-```
-Then open http://localhost:6006 and go to the **IMAGES** tab.
-
-### 3. View Saved Images
-```bash
 ls runs/vae_mimic/seed_42/samples/
-# epoch_0000.png, epoch_0005.png, epoch_0010.png, ...
 ```
 
----
+### Using the callback directly
 
-## Configuration
+```python
+import pytorch_lightning as pl
+from training.callbacks import VAEVisualizationCallback
 
-### Default Settings (Already Configured)
-
-The config file `configs/experiments/vae_mimic.yaml` now includes:
-
-```yaml
-visualization:
-  every_n_epochs: 5        # Visualize every 5 epochs
-  num_samples: 4           # Show 4 ECG samples
-  plot_all_leads: true     # Separate subplot per lead
-  log_to_tensorboard: true # Log to TensorBoard
-  log_to_wandb: false      # W&B disabled by default
+viz = VAEVisualizationCallback(
+    save_dir="runs/my_exp/seed_42/samples",
+    log_every_n_epochs=1,
+    num_samples=8,
+    plot_all_leads=True,
+    log_to_tensorboard=True,
+    log_to_wandb=False,
+)
+trainer = pl.Trainer(callbacks=[viz], max_epochs=10)
 ```
 
-### Customize Settings
+Requirements on the model and data:
 
-**Option 1: Edit the YAML file**
-```bash
-nano configs/experiments/vae_mimic.yaml
-# Modify the visualization section
+- validation batches must be `(ecg, features)` tuples (as produced by `MIMICIVECGDataset`);
+- the LightningModule must expose `vae` or `vqvae` (or be callable itself) returning a tuple whose
+  first element is the reconstruction.
+
+### Reading the plots
+
+| Observation | Likely cause | Try |
+|-------------|--------------|-----|
+| Smooth / blurry reconstructions, missing P or T waves | KL term too strong (VAE) or too little capacity | Lower `kl_weight`; raise `base_channels` / `num_res_blocks` |
+| Reconstructions do not improve across epochs | Learning-rate problem | Adjust `lr` |
+| Excellent reconstructions but poor `sample()` output (VAE) | Latent not close to N(0, I) | Raise `kl_weight` |
+
+### Troubleshooting
+
+- **No images**: validation runs on 0-based epochs `e` with `(e + 1) % check_val_every_n_epoch == 0`,
+  and the callback needs `e % every_n_epochs == 0` on such an epoch (see the warning above). Setting
+  `every_n_epochs: 1` always works. Images are also skipped during the sanity check.
+- **Nothing in TensorBoard**: `configs/experiments/vae_mimic.yaml` and `vqvae_mimic.yaml` ship with
+  `log_to_tensorboard: false`; set it to `true`.
+- **Large figures / memory**: lower `num_samples` or use `plot_all_leads: false`.
+
+## The `visualization` package
+
+```python
+from visualization import (
+    plot_ecg_leads, plot_ecg_comparison, plot_ecg_overlay,
+    plot_latent_space_2d, plot_latent_distribution,
+    plot_training_curves, plot_multiple_metrics, plot_learning_rate_schedule,
+)
 ```
 
-**Option 2: Use command-line arguments**
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --viz-every-n-epochs 10 \
-    --viz-num-samples 8 \
-    --viz-plot-all-leads
+Every function returns a `matplotlib.figure.Figure`; save it with `fig.savefig(...)`. ECG inputs
+can be `torch.Tensor` or `numpy.ndarray`; time axes are in seconds using `sampling_rate` (default
+500 Hz).
+
+### ECG plots — `visualization/ecg_plots.py`
+
+| Function | Signature (defaults) | Plots |
+|----------|----------------------|-------|
+| `plot_ecg_leads` | `(ecg, lead_names=None, sampling_rate=500, title="ECG Signal", figsize=(15, 10))` | All leads of one ECG `(num_leads, seq_length)`, one row per lead |
+| `plot_ecg_comparison` | `(real, generated, lead_idx=0, lead_name="Lead I", sampling_rate=500, figsize=(12, 4))` | One lead, real above generated |
+| `plot_ecg_overlay` | `(signals, labels, lead_idx=0, lead_name="Lead I", sampling_rate=500, figsize=(12, 4))` | One lead from several signals, overlaid |
+
+`plot_ecg_leads` needs at least two leads (it indexes the subplot array).
+
+### Latent space — `visualization/latent_space.py`
+
+| Function | Signature (defaults) | Plots |
+|----------|----------------------|-------|
+| `plot_latent_space_2d` | `(latents, labels=None, method="pca", title="Latent Space Visualization", figsize=(10, 8))` | 2-D PCA (`"pca"`) or t-SNE (`"tsne"`) projection; 3-D latents `(N, C, L)` are flattened |
+| `plot_latent_distribution` | `(latents, figsize=(12, 4))` | Per-dimension mean ± std and a histogram of all values |
+
+### Training curves — `visualization/training_curves.py`
+
+| Function | Signature (defaults) | Plots |
+|----------|----------------------|-------|
+| `plot_training_curves` | `(train_losses, val_losses, metric_name="Loss", figsize=(10, 6))` | Train vs val per epoch |
+| `plot_multiple_metrics` | `(metrics_dict, figsize=(15, 10))` | `{"metric": {"train": [...], "val": [...]}}` in a 2-column grid |
+| `plot_learning_rate_schedule` | `(learning_rates, figsize=(10, 4))` | LR per epoch, log scale |
+
+### Example: inspect a trained VAE
+
+```python
+import torch
+from models.vae import VAELightning, VAEConfig
+from data.datasets.mimic.dataset import MIMICIVECGDataset
+from visualization import plot_ecg_leads, plot_ecg_comparison, plot_latent_space_2d
+
+ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
+model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
+model.load_state_dict(ckpt["state_dict"])
+model.eval()
+
+ds = MIMICIVECGDataset(mimic_path="/path/to/mimic-iv-ecg", split="test", max_samples=64)
+x = torch.stack([ds[i][0] for i in range(64)])        # (64, 12, 5000)
+
+recon = model.reconstruct(x)
+plot_ecg_comparison(x[0], recon[0], lead_idx=1, lead_name="II").savefig("lead_II.png")
+plot_ecg_leads(model.sample(n_samples=1)[0], title="VAE sample").savefig("sample.png")
+
+latents = model.vae.encode_to_latent(x)                # (64, 8, 625)
+plot_latent_space_2d(latents, method="pca").savefig("latent_pca.png")
 ```
 
----
-
-## Visualization Modes
-
-### Mode 1: Separate Leads (Default)
-```yaml
-plot_all_leads: true
-```
-- Each ECG lead in its own subplot
-- Medical-style layout
-- 2 rows per sample (real + reconstructed)
-- 12 columns (I, II, III, aVR, aVL, aVF, V1-V6)
-- **Best for**: Detailed analysis, identifying lead-specific issues
-
-### Mode 2: Overlay
-```yaml
-plot_all_leads: false
-```
-- All leads overlaid with different colors
-- Compact view
-- 2 columns (real vs reconstructed)
-- **Best for**: Quick overview, comparing overall shape
-
----
-
-## Files Created
-
-### Core Implementation
-```
-src/ecgen/training/
-├── __init__.py                    # Training module initialization
-└── callbacks.py                   # All callbacks including VAEVisualizationCallback
-```
-
-### Documentation
-```
-docs/VAE_VISUALIZATION.md          # Full user guide (7 KB)
-scripts/README_VISUALIZATION.md    # Quick reference (2 KB)
-VISUALIZATION_SUMMARY.md           # Feature overview (4 KB)
-CHANGES.md                         # Detailed changes (7 KB)
-README_VAE_VISUALIZATION.md        # This file
-```
-
-### Modified Files
-```
-scripts/train_vae_mimic.py         # Added visualization support
-configs/experiments/vae_mimic.yaml # Added visualization config
-```
-
----
-
-## Usage Examples
-
-### Example 1: Quick Testing (Visualize Every Epoch)
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --viz-every-n-epochs 1 \
-    --viz-num-samples 2
-```
-
-### Example 2: Production Training (Less Frequent)
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --viz-every-n-epochs 10 \
-    --viz-num-samples 8
-```
-
-### Example 3: With Weights & Biases
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --wandb \
-    --viz-log-to-wandb
-```
-
-### Example 4: Overlay Mode (Compact)
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --viz-every-n-epochs 5 \
-    --viz-num-samples 4
-    # Note: plot_all_leads is false by default in CLI
-```
-
----
-
-## What to Look For in Visualizations
-
-### ✅ Good Reconstruction
-- Reconstructed signals closely match real signals
-- All leads are preserved
-- QRS complexes, P waves, T waves visible
-- Similar amplitude and timing
-
-### ⚠️ Poor Reconstruction
-- Blurry or smoothed signals → KL weight too high
-- Missing features (P waves, T waves) → Model underfitting
-- Wrong amplitudes → Learning rate issues
-- Phase shifts → Temporal alignment problems
-
----
-
-## Command-Line Arguments
-
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--viz-every-n-epochs` | 5 | Visualize every N epochs |
-| `--viz-num-samples` | 4 | Number of samples to plot |
-| `--viz-plot-all-leads` | false | Plot each lead separately |
-| `--viz-log-to-tensorboard` | true | Log to TensorBoard |
-| `--viz-log-to-wandb` | false | Log to W&B |
-
----
-
-## Output Locations
-
-1. **Disk**: `runs/{exp_name}/seed_{seed}/samples/epoch_XXXX.png`
-2. **TensorBoard**: IMAGES tab
-3. **W&B**: Media panel (if enabled)
-
----
-
-## Performance
-
-- **Overhead**: Minimal (~1-2 seconds every 5 epochs)
-- **Disk Space**: ~500KB-1MB per image
-- **Memory**: No additional memory during training
-- **When**: Only runs during validation phase
-
----
-
-## Troubleshooting
-
-### Issue: No visualizations generated
-**Solution**: Check that validation is running (`check_val_every_n_epoch` in config)
-
-### Issue: TensorBoard not showing images
-**Solution**: 
-1. Verify TensorBoard is pointing to correct directory
-2. Refresh browser
-3. Check `viz_log_to_tensorboard: true`
-
-### Issue: Out of memory
-**Solution**: 
-1. Reduce `viz_num_samples`
-2. Use `plot_all_leads: false`
-
----
-
-## Documentation Reference
-
-- **Quick Reference**: `scripts/README_VISUALIZATION.md`
-- **Full Guide**: `docs/VAE_VISUALIZATION.md`
-- **Feature Summary**: `VISUALIZATION_SUMMARY.md`
-- **Changes**: `CHANGES.md`
-
----
-
-## Testing Status
-
-✅ All tests passed:
-- Callback imports correctly
-- Visualization functions work
-- YAML config is valid
-- Integration with training script verified
-- Dummy data visualization successful
-
----
-
-## Next Steps
-
-1. **Start training** with visualization enabled:
-   ```bash
-   ./scripts/run_train_vae_mimic_config.sh
-   ```
-
-2. **Monitor in TensorBoard**:
-   ```bash
-   tensorboard --logdir runs/vae_mimic/seed_42/tb
-   ```
-
-3. **Check visualizations** at epochs 0, 5, 10, 15, ...
-
-4. **Adjust hyperparameters** based on visual quality
-
-5. **Compare experiments** by examining different runs
-
----
-
-## Benefits
-
-✅ **Early problem detection** - Spot issues immediately  
-✅ **Quality assessment** - Visual confirmation of reconstruction  
-✅ **Hyperparameter tuning** - Compare configurations visually  
-✅ **Progress tracking** - See improvement over time  
-✅ **Publication ready** - High-quality plots (150 DPI)  
-
----
-
-## Technical Details
-
-- **Framework**: PyTorch Lightning Callback
-- **Plotting**: Matplotlib
-- **Format**: PNG (150 DPI)
-- **Dependencies**: No new packages required
-- **Python**: 3.7+
-- **Tested**: ✅ Fully tested and working
-
----
-
-**Status**: ✅ Complete and ready to use  
-**Date**: 2026-02-27  
-**Feature**: VAE Visualization System  
-
----
-
-## Support
-
-For issues or questions:
-1. Check `docs/VAE_VISUALIZATION.md` for detailed documentation
-2. Review `scripts/README_VISUALIZATION.md` for quick reference
-3. Examine `CHANGES.md` for implementation details
-
-**Enjoy monitoring your VAE training! 🎉**
-# VAE Visualization Feature - Summary
-
-## What Was Added
-
-A comprehensive visualization system to monitor VAE reconstruction quality during training.
-
-## Files Created/Modified
-
-### New/Modified Files
-
-1. **`src/ecgen/training/callbacks.py`** (MODIFIED)
-   - Added VAEVisualizationCallback class
-   - Two visualization modes: separate leads and overlaid leads
-   - TensorBoard and Weights & Biases integration
-   - ~270 lines of well-documented code
-
-2. **`src/ecgen/training/__init__.py`** (NEW)
-   - Module initialization for training package
-   - Exports all callback classes
-
-3. **`docs/VAE_VISUALIZATION.md`**
-   - Comprehensive documentation
-   - Usage guide, configuration options, troubleshooting
-   - Examples and best practices
-
-### Modified Files
-
-1. **`scripts/train_vae_mimic.py`**
-   - Added import for visualization callback
-   - Added command-line arguments for visualization settings
-   - Added YAML config parsing for visualization section
-   - Integrated callback into training pipeline
-
-2. **`configs/experiments/vae_mimic.yaml`**
-   - Added `visualization` section with default settings
-   - Configured to visualize every 5 epochs by default
-
-## Features
-
-✅ **Automatic Visualization**
-- Generates comparison plots during training
-- Configurable frequency (every N epochs)
-- Multiple samples per visualization
-
-✅ **Two Visualization Styles**
-- Separate leads: Each lead in its own subplot (medical-style)
-- Overlaid leads: All leads overlaid in one plot (compact)
-
-✅ **Multiple Output Formats**
-- Saved as PNG files to disk
-- Logged to TensorBoard (optional)
-- Logged to Weights & Biases (optional)
-
-✅ **Flexible Configuration**
-- YAML config file support
-- Command-line argument overrides
-- Programmatic API
-
-## Usage
-
-### Quick Start
-
-Just run your training script as usual - visualization is enabled by default:
-
-```bash
-./scripts/run_train_vae_mimic_config.sh
-```
-
-Visualizations will be saved to: `runs/vae_mimic/seed_42/samples/`
-
-### View in TensorBoard
-
-```bash
-tensorboard --logdir runs/vae_mimic/seed_42/tb
-```
-
-Navigate to the "IMAGES" tab to see visualizations.
-
-### Customize Settings
-
-Edit `configs/experiments/vae_mimic.yaml`:
-
-```yaml
-visualization:
-  every_n_epochs: 5      # How often to visualize
-  num_samples: 4         # Number of samples
-  plot_all_leads: true   # Separate (true) or overlay (false)
-  log_to_tensorboard: true
-  log_to_wandb: false
-```
-
-Or use command-line arguments:
-
-```bash
-./scripts/run_train_vae_mimic_config.sh \
-    --viz-every-n-epochs 10 \
-    --viz-num-samples 8 \
-    --viz-plot-all-leads
-```
-
-## Configuration Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `every_n_epochs` | 5 | Generate visualizations every N epochs |
-| `num_samples` | 4 | Number of ECG samples to visualize |
-| `plot_all_leads` | true | Plot leads separately (true) or overlaid (false) |
-| `log_to_tensorboard` | true | Log images to TensorBoard |
-| `log_to_wandb` | false | Log images to Weights & Biases |
-
-## Output Examples
-
-### Separate Leads Mode (`plot_all_leads: true`)
-
-Creates a grid showing:
-- **Rows**: 2 per sample (real + reconstructed)
-- **Columns**: 12 (one per ECG lead: I, II, III, aVR, aVL, aVF, V1-V6)
-- **Layout**: Medical-style, easy to compare each lead
-
-### Overlay Mode (`plot_all_leads: false`)
-
-Creates a compact view:
-- **Columns**: 2 (real vs reconstructed)
-- **Rows**: Number of samples
-- **Layout**: All leads overlaid with different colors
-
-## Benefits
-
-1. **Early Problem Detection**: Spot training issues immediately
-2. **Quality Assessment**: Visual confirmation of reconstruction quality
-3. **Hyperparameter Tuning**: Compare different configurations visually
-4. **Progress Tracking**: See improvement over epochs
-5. **Publication Ready**: High-quality plots for papers/presentations
-
-## Performance Impact
-
-- **Minimal**: Visualization runs only during validation
-- **Configurable**: Adjust frequency to balance monitoring vs speed
-- **Default settings**: ~1-2 seconds per visualization every 5 epochs
-
-## Next Steps
-
-1. **Start training** and monitor visualizations
-2. **Check TensorBoard** to view images during training
-3. **Adjust settings** based on your needs
-4. **Compare experiments** by examining visualization outputs
-
-## Documentation
-
-For detailed information, see: `docs/VAE_VISUALIZATION.md`
-
-## Technical Details
-
-- **Framework**: PyTorch Lightning Callback
-- **Plotting**: Matplotlib
-- **Image Format**: PNG (150 DPI)
-- **Dependencies**: No additional packages required (uses existing dependencies)
+## Related
+
+- [Callbacks](../training/callbacks.md)
+- [VAE training](../training/vae_training.md)
+- [API reference: visualization](../api/visualization.md)
