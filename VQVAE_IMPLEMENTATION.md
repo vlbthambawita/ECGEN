@@ -194,15 +194,15 @@ samples = prior.sample(
 
 ### VQ-VAE (Stage 1)
 - **Input**: [B, 12, 5000] ECG signals
-- **Encoder output**: [B, 64, 312] continuous latent
-- **Quantized**: [B, 64, 312] discrete latent (512 codebook entries)
+- **Encoder output**: [B, 64, 625] continuous latent
+- **Quantized**: [B, 64, 625] discrete latent (512 codebook entries)
 - **Decoder output**: [B, 12, 5000] reconstructed ECG
 - **Loss**: MSE reconstruction + VQ loss (codebook + commitment)
 
 ### PixelCNN Prior (Stage 2)
-- **Input**: [B, 312] discrete code indices
+- **Input**: [B, 625] discrete code indices
 - **Architecture**: 3 layers of gated masked convolutions
-- **Output**: [B, 512, 312] logits over codebook
+- **Output**: [B, 512, 625] logits over codebook
 - **Loss**: Cross-entropy for next-code prediction
 - **Sampling**: Autoregressive with temperature control
 

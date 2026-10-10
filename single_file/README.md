@@ -112,7 +112,7 @@ The shell script supports configuration through environment variables:
 
 #### Model Settings (Stage 2)
 - `HIDDEN_DIM` - Hidden dimension for PixelCNN (default: 128)
-- `NUM_LAYERS` - Number of gated conv layers (default: 3)
+- `NUM_LAYERS` - Number of gated causal conv blocks (default: 10). Kernel size (2) and dilation cycle (10) have no env vars; use the Python flags
 - `VQVAE_CHECKPOINT` - Path to VQ-VAE checkpoint (required for Stage 2)
 
 #### Training Settings
@@ -189,7 +189,9 @@ NUM_LAYERS=5 \
 
 ### Stage 2 Arguments
 - `--hidden-dim` - Hidden dimension for PixelCNN
-- `--num-layers` - Number of gated conv layers
+- `--num-layers` - Number of gated causal conv blocks (default: 10)
+- `--kernel-size` - Kernel size of the causal convolutions (default: 2)
+- `--dilation-cycle` - Layers after which the dilation resets to 1 (default: 10)
 - `--vqvae-checkpoint` - Path to VQ-VAE checkpoint [required for Stage 2]
 
 ### Training Arguments
@@ -272,12 +274,12 @@ Input ECG [B, 12, 5000]
     ↓
 Encoder (Conv1D + ResBlocks + Downsampling)
     ↓
-Latent [B, 64, 312]
+Latent [B, 64, 625]
     ↓
 Vector Quantizer (Codebook size: 512)
     ↓
-Quantized Latent [B, 64, 312]
-Discrete Indices [B, 312]
+Quantized Latent [B, 64, 625]
+Discrete Indices [B, 625]
     ↓
 Decoder (Conv1D + ResBlocks + Upsampling)
     ↓
@@ -287,16 +289,22 @@ Reconstructed ECG [B, 12, 5000]
 ### Stage 2: PixelCNN Prior
 
 ```
-Discrete Indices [B, 312]
+Discrete Indices [B, 625]
     ↓
-Embedding Layer
+Embedding Layer, shifted right by one position
     ↓
-Gated Masked Conv1D Layers (Autoregressive)
+CausalGatedBlock × num_layers (causal dilated conv, dilations 1, 2, ..., 512;
+gated tanh·sigmoid; residual + skip 1x1 convs; receptive field 1024 codes)
     ↓
-Logits [B, 512, 312]
+Summed skips → ReLU → 1x1 Conv → ReLU → 1x1 Conv
     ↓
-Cross-Entropy Loss
+Logits [B, 512, 625]
+    ↓
+Cross-Entropy Loss (logit t vs. code t; logit t only sees codes < t)
 ```
+
+Prior checkpoints from the earlier mask-A/B `GatedMaskedConv1d` architecture cannot be loaded
+into the current model. Retrain Stage 2; Stage 1 checkpoints are unaffected.
 
 ## Troubleshooting
 

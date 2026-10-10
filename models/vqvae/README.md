@@ -35,10 +35,19 @@ The VQ-VAE consists of three main components:
 
 The prior model learns the distribution p(z) over discrete codes:
 
-- **Architecture**: Autoregressive PixelCNN with gated masked convolutions
+- **Architecture**: WaveNet-style autoregressive prior. Code embeddings are shifted right by one
+  position, then passed through `num_layers` (default 10) `CausalGatedBlock`s: causal dilated
+  convolutions (kernel size 2, dilation `2 ** (i % dilation_cycle)` = 1, 2, ..., 512) with gated
+  `tanh * sigmoid` activations, residual and skip 1x1 convs. The summed skips go through a
+  ReLU / 1x1 conv / ReLU / 1x1 conv head. Receptive field: 1024 codes (`prior.receptive_field`),
+  enough to cover all 625 codes. About 1.14 M parameters with the defaults
 - **Input**: Discrete code indices `[B, 625]`
-- **Output**: Logits over codebook `[B, 512, 625]`
-- **Training**: Cross-entropy loss for next-code prediction
+- **Output**: Logits over codebook `[B, 512, 625]`; the logit at position t predicts code t from codes < t
+- **Training**: Cross-entropy loss of each code given the codes before it (same convention as sampling)
+
+> Prior checkpoints from the earlier mask-A/B `GatedMaskedConv1d` architecture cannot be loaded
+> into the current `PriorLightning` (different `state_dict` keys). Retrain stage 2; stage-1
+> VQ-VAE checkpoints are unaffected.
 
 ## Key Differences from Standard VAE
 
@@ -151,7 +160,9 @@ Key hyperparameters in `configs/model/vqvae/prior_base.yaml`:
 ```yaml
 num_embeddings: 512        # Must match VQ-VAE
 hidden_dim: 128            # PixelCNN hidden dimension
-num_layers: 3              # Number of gated conv layers
+num_layers: 10             # Number of gated causal conv blocks
+kernel_size: 2             # Kernel size of the causal convolutions
+dilation_cycle: 10         # Dilations 1, 2, ..., 512 -> receptive field of 1024 codes
 lr: 0.001                  # Learning rate (higher than VQ-VAE)
 ```
 
@@ -196,11 +207,14 @@ from models.vqvae import PixelCNNPrior
 prior = PixelCNNPrior(
     num_embeddings=512,
     hidden_dim=128,
-    num_layers=3,
+    num_layers=10,
+    kernel_size=2,
+    dilation_cycle=10,
 )
 
-# Predict next codes
+# Logits at position t predict code t from codes < t
 logits = prior(indices)
+print(prior.receptive_field)  # 1024
 
 # Sample autoregressively
 sampled_indices = prior.sample(batch_size=16, latent_length=625)

@@ -168,7 +168,9 @@ def parse_args() -> argparse.Namespace:
     # Model
     parser.add_argument("--num-embeddings", type=int, default=512, help="Codebook size (must match VQ-VAE)")
     parser.add_argument("--hidden-dim", type=int, default=128, help="Hidden dimension for PixelCNN")
-    parser.add_argument("--num-layers", type=int, default=3, help="Number of gated conv layers")
+    parser.add_argument("--num-layers", type=int, default=10, help="Number of gated causal conv layers")
+    parser.add_argument("--kernel-size", type=int, default=2, help="Kernel size of the causal convolutions")
+    parser.add_argument("--dilation-cycle", type=int, default=10, help="Layers after which the dilation resets to 1")
     parser.add_argument("--seq-length", type=int, default=5000, help="ECG sequence length")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--b1", type=float, default=0.9, help="Adam beta1")
@@ -225,6 +227,8 @@ def main() -> None:
             args.num_embeddings = model_cfg.get('num_embeddings', args.num_embeddings)
             args.hidden_dim = model_cfg.get('hidden_dim', args.hidden_dim)
             args.num_layers = model_cfg.get('num_layers', args.num_layers)
+            args.kernel_size = model_cfg.get('kernel_size', args.kernel_size)
+            args.dilation_cycle = model_cfg.get('dilation_cycle', args.dilation_cycle)
             args.lr = model_cfg.get('lr', args.lr)
             args.b1 = model_cfg.get('b1', args.b1)
             args.b2 = model_cfg.get('b2', args.b2)
@@ -293,6 +297,8 @@ def main() -> None:
         num_embeddings=args.num_embeddings,
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
+        kernel_size=args.kernel_size,
+        dilation_cycle=args.dilation_cycle,
         lr=args.lr,
         b1=args.b1,
         b2=args.b2,
@@ -345,6 +351,8 @@ def main() -> None:
                     "num_embeddings": args.num_embeddings,
                     "hidden_dim": args.hidden_dim,
                     "num_layers": args.num_layers,
+                    "kernel_size": args.kernel_size,
+                    "dilation_cycle": args.dilation_cycle,
                     "seq_length": args.seq_length,
                     "lr": args.lr,
                     "batch_size": args.batch_size,

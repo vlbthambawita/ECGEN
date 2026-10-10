@@ -24,7 +24,9 @@ model:
     config:
       num_embeddings: 512
       hidden_dim: 128
-      num_layers: 3
+      num_layers: 10
+      kernel_size: 2
+      dilation_cycle: 10  # dilations 1..512 -> receptive field of 1024 codes
       lr: 0.001
       b1: 0.9
       b2: 0.999

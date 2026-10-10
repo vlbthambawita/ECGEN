@@ -17,7 +17,7 @@ All classes live in `models/vqvae/` and are exported from `models.vqvae`:
 from models.vqvae import (
     VQVAEConfig, PriorConfig,            # dataclass configs
     VQVAE1D, VectorQuantizer,            # plain nn.Modules (stage 1)
-    PixelCNNPrior, GatedMaskedConv1d,    # plain nn.Modules (stage 2)
+    PixelCNNPrior, CausalGatedBlock,     # plain nn.Modules (stage 2)
     VQVAELightning, PriorLightning,      # LightningModule wrappers
 )
 ```
@@ -77,22 +77,31 @@ works as follows:
 
 ### PixelCNN prior
 
-`PixelCNNPrior(num_embeddings, hidden_dim, num_layers)` (`models/vqvae/pixelcnn_prior.py`) has
-these parts:
+`PixelCNNPrior(num_embeddings=512, hidden_dim=128, num_layers=10, kernel_size=2, dilation_cycle=10)`
+(`models/vqvae/pixelcnn_prior.py`) is a WaveNet-style stack of causal dilated convolutions. It
+has these parts:
 
 - `nn.Embedding(num_embeddings, hidden_dim)` turns code indices into vectors.
-- One `GatedMaskedConv1d` layer with mask **A**, followed by `num_layers - 1` layers with mask **B**.
-  All use kernel size 3 and the gated activation `tanh(W_f * x) * sigmoid(W_g * x)`. Mask A hides
-  the current and future positions. Mask B hides only future positions.
-- A 1×1 `Conv1d` maps `hidden_dim` to `num_embeddings` logits.
-- `forward(indices [B, L])` returns `logits [B, num_embeddings, L]`.
+- The embedded sequence is shifted right by one position (zeros at `t = 0`), so position `t`
+  only sees codes `< t`.
+- `num_layers` `CausalGatedBlock(hidden_dim, kernel_size, dilation)` blocks. Block `i` uses
+  dilation `2 ** (i % dilation_cycle)`, so with the defaults the dilations are 1, 2, 4, …, 512.
+  Each block left-pads its input by `(kernel_size - 1) * dilation`, applies a causal dilated
+  conv with the gated activation `tanh(W_f * x) * sigmoid(W_g * x)`, and produces a 1×1
+  residual output (added to the block input) and a 1×1 skip output.
+- The skip outputs of all blocks are summed and passed through a head: ReLU, 1×1 `Conv1d`,
+  ReLU, 1×1 `Conv1d` to `num_embeddings` logits.
+- `forward(indices [B, L])` returns `logits [B, num_embeddings, L]`. The logit at position `t`
+  predicts code `t` from codes `< t`.
+- `receptive_field` returns `1 + sum((kernel_size - 1) * d)` over the block dilations: **1024**
+  codes with the defaults, which covers all 625 codes of a 5000-sample ECG.
 - `sample(batch_size=1, latent_length=625, temperature=1.0, device="cuda")` fills a zero tensor
-  one position at a time, drawing each code from `softmax(logits / temperature)`.
+  one position at a time, drawing each code from `softmax(logits / temperature)`. Each step only
+  feeds the last `receptive_field` codes to the network (`indices[:, start:i+1]`), which gives
+  the same result as feeding the full context.
 
-!!! note "Small receptive field"
-    With kernel size 3 and the default `num_layers=3`, each output position sees only the
-    3 preceding codes, which is 24 ECG samples or 48 ms at 500 Hz. The prior cannot model
-    long-range structure such as consecutive beats unless you increase `num_layers`.
+Training and sampling use the logits the same way: logit `t` is trained to predict code `t`
+(see `PriorLightning.compute_loss` below), and sampling draws code `t` from logit `t`.
 
 ## Shapes and downsampling factor
 
@@ -122,12 +131,8 @@ the input.
 `ValueError` if `seq_length` is not a multiple of the factor. `VQVAELightning.sample()` and
 `PriorLightning.sample()` both use it, so samples always have the requested length.
 
-!!! note
-    The `[B, 312]` shapes in `models/vqvae/README.md` and `VQVAE_IMPLEMENTATION.md` assume a
-    factor of 16. The real latent length for 5000 samples is 625.
-
 With the default config, the stage-1 model has about 6.38 M parameters and the PixelCNN prior
-has about 0.43 M.
+has about 1.14 M (1,136,256).
 
 ## Configuration
 
@@ -156,7 +161,9 @@ arguments (`VQVAELightning(num_embeddings=256)`), which is what `load_from_check
 |---|---|---|---|
 | `num_embeddings` | `int` | `512` | Vocabulary size. **Must equal the VQ-VAE's `num_embeddings`** |
 | `hidden_dim` | `int` | `128` | Embedding and conv width of the PixelCNN |
-| `num_layers` | `int` | `3` | Number of gated masked conv layers (1 × mask A + `num_layers-1` × mask B) |
+| `num_layers` | `int` | `10` | Number of `CausalGatedBlock` layers |
+| `kernel_size` | `int` | `2` | Kernel size of the causal convolutions |
+| `dilation_cycle` | `int` | `10` | Layer `i` uses dilation `2 ** (i % dilation_cycle)`. The defaults give dilations 1 … 512 and a receptive field of 1024 codes |
 | `lr` | `float` | `1e-3` | Adam learning rate |
 | `b1` | `float` | `0.9` | Adam β1 |
 | `b2` | `float` | `0.999` | Adam β2 |
@@ -229,7 +236,8 @@ Logged metrics:
 | Method | Description |
 |---|---|
 | `forward(indices)` | Returns the prior logits `[B, K, L]` |
-| `training_step` / `validation_step` | Encode the batch with the frozen VQ-VAE (`encode_to_indices`), then apply `prior_loss(logits[:, :, :-1], indices[:, 1:])`. Raise `RuntimeError` if no VQ-VAE is loaded |
+| `compute_loss(indices)` | Returns `prior_loss(self.prior(indices), indices)`: cross-entropy of each code given the codes before it |
+| `training_step` / `validation_step` | Encode the batch with the frozen VQ-VAE (`encode_to_indices`), then return `compute_loss(indices)`. Raise `RuntimeError` if no VQ-VAE is loaded |
 | `sample(n_samples=16, seq_length=5000, temperature=1.0)` | Samples indices from the prior and decodes them with the VQ-VAE. See the factor-16 warning above |
 | `configure_optimizers()` | Adam over `self.prior` parameters only |
 
@@ -239,12 +247,11 @@ Because `self.vqvae` is a registered submodule, the frozen VQ-VAE weights are sa
 every prior checkpoint, under keys `vqvae.vqvae.*`. Together with the recorded `vqvae_config`,
 this makes a prior checkpoint self-contained (see [Loading checkpoints](#loading-checkpoints)).
 
-!!! warning "Training and sampling are off by one"
-    Because of mask A, the logit at position `t` depends only on codes `< t`. `PixelCNNPrior.sample()`
-    uses it that way: it draws code `t` from logit `t`. `PriorLightning` additionally shifts the
-    targets, `logits[:, :, :-1]` vs `indices[:, 1:]`, so during training logit `t` learns to predict
-    code `t + 1` without seeing code `t`. Sampling therefore uses each logit for a different position
-    than the one it was trained on. If you change the prior, remove one of the two shifts.
+!!! warning "Retrain stage-2 checkpoints from before the prior rewrite"
+    The prior used to be a stack of mask-A/B `GatedMaskedConv1d` layers. Prior checkpoints from
+    that architecture have different `state_dict` keys and cannot be loaded into the current
+    `PriorLightning`. Retrain stage 2 from your stage-1 checkpoint. Stage-1 VQ-VAE checkpoints
+    are not affected.
 
 ## Loading checkpoints
 
@@ -317,8 +324,9 @@ indices = prior.prior.sample(
 ecgs = prior.vqvae.decode_from_indices(indices) # [16, 12, 5000]
 ```
 
-Sampling is sequential over the 625 latent positions. Each step runs a full forward pass of the
-prior, so expect it to be slow on CPU.
+Sampling is sequential over the 625 latent positions. Each step runs a forward pass of the
+prior over the last `receptive_field` codes (all of them with the defaults), so expect it to be
+slow on CPU.
 
 ## Related
 

@@ -75,10 +75,13 @@ snaps every latent vector to its nearest codebook entry (L2), with
 Total loss = MSE reconstruction + `vq_loss` (`training.losses.vqvae_loss`).
 
 **Stage 2 — `PixelCNNPrior` / `PriorLightning`.** `PriorLightning` loads a frozen stage-1 checkpoint
-(`PriorConfig.vqvae_checkpoint`), encodes each batch to code indices, and trains a 1-D PixelCNN:
-an embedding of the codes, one mask-type-A `GatedMaskedConv1d` followed by `num_layers - 1` type-B
-layers (gated `tanh·sigmoid` activations, kernel size 3), and a 1×1 conv to `num_embeddings` logits.
-Loss is cross-entropy (`training.losses.prior_loss`).
+(`PriorConfig.vqvae_checkpoint`), encodes each batch to code indices, and trains a WaveNet-style
+autoregressive prior: an embedding of the codes shifted right by one position, `num_layers` (default 10)
+`CausalGatedBlock`s (causal dilated convs with kernel size 2, dilations `2 ** (i % dilation_cycle)`,
+gated `tanh·sigmoid` activations, residual and skip 1×1 convs), and a ReLU/1×1-conv head over the
+summed skips that outputs `num_embeddings` logits. The default receptive field is 1024 codes, which
+covers the full 625-code sequence. Logit `t` predicts code `t` from codes `< t`, in training and in
+sampling. Loss is cross-entropy (`training.losses.prior_loss`).
 
 **Sampling.** `PriorLightning.sample()` draws code indices autoregressively from the prior and decodes
 them with the frozen VQ-VAE (`decode_from_indices`). `VQVAELightning.sample()` exists too, but picks

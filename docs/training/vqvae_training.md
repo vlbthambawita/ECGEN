@@ -15,6 +15,12 @@ and records its config in the prior's hyperparameters, so a finished prior check
 restored on its own with `PriorLightning.load_from_checkpoint(path)`. See
 [Loading checkpoints](../models/vqvae.md#loading-checkpoints).
 
+!!! warning "Old stage-2 checkpoints must be retrained"
+    The PixelCNN prior was rewritten as a stack of causal dilated `CausalGatedBlock`s (default
+    receptive field 1024 codes). Prior checkpoints from the earlier mask-A/B architecture have
+    different `state_dict` keys and do not load into the current `PriorLightning`, so rerun
+    stage 2. Stage-1 VQ-VAE checkpoints are unaffected.
+
 ## Quick start
 
 ```bash
@@ -133,7 +139,9 @@ There is no flag for `channel_multipliers`. The script hard-codes `(1, 2, 4, 4)`
 |---|---|
 | `--vqvae-checkpoint` | `None`. Overrides `model.params.config.vqvae_checkpoint` from the YAML. One of the two must be set, or the script exits with an error |
 | `--hidden-dim` | `128` |
-| `--num-layers` | `3` |
+| `--num-layers` | `10` |
+| `--kernel-size` | `2` |
+| `--dilation-cycle` | `10` |
 
 Stage 2 fixes `num_leads=12` for the dataset and does not add a visualization callback.
 
@@ -142,7 +150,7 @@ Stage 2 fixes `num_leads=12` for the dataset and does not add a visualization ca
 | YAML key | Stage 1 | Stage 2 |
 |---|---|---|
 | `experiment.{name, seed, runs_root}` | yes | yes |
-| `model.params.config.*` | `in_channels`, `base_channels`, `latent_channels`, `num_res_blocks`, `num_embeddings`, `commitment_cost`, `lr`, `b1`, `b2` | `num_embeddings`, `hidden_dim`, `num_layers`, `lr`, `b1`, `b2`, `vqvae_checkpoint` |
+| `model.params.config.*` | `in_channels`, `base_channels`, `latent_channels`, `num_res_blocks`, `num_embeddings`, `commitment_cost`, `lr`, `b1`, `b2` | `num_embeddings`, `hidden_dim`, `num_layers`, `kernel_size`, `dilation_cycle`, `lr`, `b1`, `b2`, `vqvae_checkpoint` |
 | `data.params.*` | `mimic_path`, `batch_size`, `num_workers`, `max_samples`, `skip_missing_check`, `val_split`, `test_split`, `seq_length` | same |
 | `trainer.*` | `max_epochs`, `accelerator`, `devices`, `log_every_n_steps`, `check_val_every_n_epoch`, `gradient_clip_val` | same |
 | `wandb.*` | `enabled`, `project`, `entity`, `run_name`, `tags` | same |
@@ -177,7 +185,7 @@ includes its `dirpath`, `patience` and `save_top_k` values.
 |---|---|
 | `experiment` | `name: prior_mimic`, `seed: 42` |
 | `wandb` | `enabled: false`, `project: ecg-vqvae-prior` |
-| `model.params.config` | `num_embeddings: 512`, `hidden_dim: 128`, `num_layers: 3`, `lr: 0.001`, `vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"` (used only when `--vqvae-checkpoint` is not given) |
+| `model.params.config` | `num_embeddings: 512`, `hidden_dim: 128`, `num_layers: 10`, `kernel_size: 2`, `dilation_cycle: 10`, `lr: 0.001`, `vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"` (used only when `--vqvae-checkpoint` is not given) |
 | `data.params` | Same dataset path. `max_samples: 10000` |
 | `trainer` | Same as stage 1 |
 
@@ -266,7 +274,7 @@ YAML enables it by default. Stage 2's does not. Note the following:
 - If `wandb` is not installed or fails to initialise, the script prints a warning and continues
   with TensorBoard only.
 - The W&B run config records the main model and data hyperparameters. For stage 2 this
-  includes `vqvae_checkpoint`.
+  includes `vqvae_checkpoint`, `num_layers`, `kernel_size` and `dilation_cycle`.
 
 Metrics logged by each stage are listed in
 [VQ-VAE model → Lightning wrappers](../models/vqvae.md#lightning-wrappers). Both stages also log

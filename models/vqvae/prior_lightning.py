@@ -32,6 +32,8 @@ class PriorLightning(pl.LightningModule):
             num_embeddings=config.num_embeddings,
             hidden_dim=config.hidden_dim,
             num_layers=config.num_layers,
+            kernel_size=config.kernel_size,
+            dilation_cycle=config.dilation_cycle,
         )
 
         # Frozen VQ-VAE for encoding/decoding. When restoring a prior checkpoint,
@@ -63,6 +65,11 @@ class PriorLightning(pl.LightningModule):
     def forward(self, indices: Tensor) -> Tensor:
         return self.prior(indices)
 
+    def compute_loss(self, indices: Tensor) -> Tensor:
+        """Cross-entropy of each code given the codes before it (logits at t predict code t)."""
+        logits = self.prior(indices)  # [B, num_embeddings, L]
+        return prior_loss(logits, indices)
+
     def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         # Handle both dict and tuple formats
         if isinstance(batch, dict):
@@ -76,12 +83,7 @@ class PriorLightning(pl.LightningModule):
                 raise RuntimeError("VQ-VAE not loaded. Provide vqvae_checkpoint in config.")
             indices = self.vqvae.encode_to_indices(ecgs)  # [B, L]
 
-        # Predict next codes autoregressively
-        logits = self.prior(indices)  # [B, num_embeddings, L]
-
-        # Compute loss: predict indices[i+1] from indices[:i]
-        # Shift targets by 1 position
-        loss = prior_loss(logits[:, :, :-1], indices[:, 1:])
+        loss = self.compute_loss(indices)
 
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
@@ -100,11 +102,7 @@ class PriorLightning(pl.LightningModule):
                 raise RuntimeError("VQ-VAE not loaded. Provide vqvae_checkpoint in config.")
             indices = self.vqvae.encode_to_indices(ecgs)
 
-        # Predict next codes
-        logits = self.prior(indices)
-
-        # Compute loss
-        loss = prior_loss(logits[:, :, :-1], indices[:, 1:])
+        loss = self.compute_loss(indices)
 
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)

@@ -32,7 +32,9 @@ class PriorConfig:
     # Model architecture
     num_embeddings: int = 512
     hidden_dim: int = 128
-    num_layers: int = 3
+    num_layers: int = 10
+    kernel_size: int = 2
+    dilation_cycle: int = 10  # dilations 1, 2, 4, ..., 512 -> receptive field of 1024 codes
     
     # Training hyperparameters
     lr: float = 1e-3

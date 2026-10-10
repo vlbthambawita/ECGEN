@@ -22,7 +22,7 @@ ECGEN/
 │   │   ├── vector_quantizer.py     #   VectorQuantizer
 │   │   ├── vqvae_1d.py             #   VQVAE1D
 │   │   ├── vqvae_lightning.py      #   VQVAELightning (stage 1)
-│   │   ├── pixelcnn_prior.py       #   GatedMaskedConv1d, PixelCNNPrior
+│   │   ├── pixelcnn_prior.py       #   CausalGatedBlock, PixelCNNPrior
 │   │   └── prior_lightning.py      #   PriorLightning (stage 2)
 │   ├── gan/
 │   │   └── pulse2pulse.py          #   WaveGANGenerator, WaveGANDiscriminator, Pulse2PulseConfig, Pulse2PulseGAN

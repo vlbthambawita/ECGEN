@@ -96,7 +96,7 @@ def prior_loss(logits: Tensor, targets: Tensor) -> Tensor:
     """Prior model loss: cross-entropy for autoregressive prediction."""
     B, num_embeddings, L = logits.shape
     logits = logits.permute(0, 2, 1).contiguous().view(-1, num_embeddings)
-    targets = targets.view(-1)
+    targets = targets.reshape(-1)
     loss = F.cross_entropy(logits, targets, reduction="mean")
     return loss
 
@@ -343,66 +343,71 @@ class VQVAE1D(nn.Module):
         return recon
 
 
-class GatedMaskedConv1d(nn.Module):
-    """Gated masked 1D convolution for autoregressive modeling."""
+class CausalGatedBlock(nn.Module):
+    """Residual gated causal 1D convolution (WaveNet-style); output at t sees inputs <= t."""
 
-    def __init__(
-        self,
-        mask_type: str,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int = 3,
-    ) -> None:
+    def __init__(self, channels: int, kernel_size: int = 2, dilation: int = 1) -> None:
         super().__init__()
-        assert mask_type in ["A", "B"]
-        self.mask_type = mask_type
-        self.kernel_size = kernel_size
+        self.left_pad = (kernel_size - 1) * dilation
+        self.conv = nn.Conv1d(channels, 2 * channels, kernel_size, dilation=dilation)
+        self.residual = nn.Conv1d(channels, channels, kernel_size=1)
+        self.skip = nn.Conv1d(channels, channels, kernel_size=1)
 
-        padding = kernel_size // 2
-        self.conv = nn.Conv1d(in_channels, 2 * out_channels, kernel_size, padding=padding)
-        self.register_buffer("mask", self._create_mask())
-
-    def _create_mask(self) -> Tensor:
-        mask = torch.ones(1, 1, self.kernel_size)
-        if self.mask_type == "A":
-            mask[:, :, self.kernel_size // 2 :] = 0
-        else:
-            mask[:, :, self.kernel_size // 2 + 1 :] = 0
-        return mask
-
-    def forward(self, x: Tensor) -> Tensor:
-        self.conv.weight.data *= self.mask
-        out = self.conv(x)
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        out = self.conv(F.pad(x, (self.left_pad, 0)))
         out_tanh, out_sigmoid = torch.chunk(out, 2, dim=1)
-        return torch.tanh(out_tanh) * torch.sigmoid(out_sigmoid)
+        h = torch.tanh(out_tanh) * torch.sigmoid(out_sigmoid)
+        return x + self.residual(h), self.skip(h)
 
 
 class PixelCNNPrior(nn.Module):
-    """PixelCNN-style autoregressive prior for VQ-VAE discrete codes."""
+    """
+    Autoregressive prior for VQ-VAE discrete codes.
+
+    Embedded codes are shifted right by one, then passed through causal dilated
+    convolutions (dilations 1, 2, 4, ..., restarting every dilation_cycle layers),
+    so logits at position t depend only on codes < t and predict code t.
+    """
 
     def __init__(
         self,
         num_embeddings: int = 512,
         hidden_dim: int = 128,
-        num_layers: int = 3,
+        num_layers: int = 10,
+        kernel_size: int = 2,
+        dilation_cycle: int = 10,
     ) -> None:
         super().__init__()
         self.num_embeddings = num_embeddings
         self.hidden_dim = hidden_dim
 
         self.embedding = nn.Embedding(num_embeddings, hidden_dim)
-        layers = [GatedMaskedConv1d("A", hidden_dim, hidden_dim)]
-        for _ in range(num_layers - 1):
-            layers.append(GatedMaskedConv1d("B", hidden_dim, hidden_dim))
-        self.net = nn.Sequential(*layers)
-        self.logits = nn.Conv1d(hidden_dim, num_embeddings, kernel_size=1)
+        self.dilations = [2 ** (i % dilation_cycle) for i in range(num_layers)]
+        self.kernel_size = kernel_size
+        self.blocks = nn.ModuleList(
+            CausalGatedBlock(hidden_dim, kernel_size, d) for d in self.dilations
+        )
+        self.head = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv1d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.ReLU(),
+            nn.Conv1d(hidden_dim, num_embeddings, kernel_size=1),
+        )
+
+    @property
+    def receptive_field(self) -> int:
+        """Number of preceding codes that can influence the prediction of a code."""
+        return 1 + sum((self.kernel_size - 1) * d for d in self.dilations)
 
     def forward(self, indices: Tensor) -> Tensor:
-        x = self.embedding(indices)
-        x = x.permute(0, 2, 1)
-        x = self.net(x)
-        logits = self.logits(x)
-        return logits
+        x = self.embedding(indices).permute(0, 2, 1)
+        # Shift right by one so position t only sees codes < t
+        x = F.pad(x, (1, 0))[:, :, :-1]
+        skip = torch.zeros_like(x)
+        for block in self.blocks:
+            x, s = block(x)
+            skip = skip + s
+        return self.head(skip)
 
     @torch.no_grad()
     def sample(
@@ -414,8 +419,8 @@ class PixelCNNPrior(nn.Module):
     ) -> Tensor:
         indices = torch.zeros(batch_size, latent_length, dtype=torch.long, device=device)
         for i in range(latent_length):
-            logits = self.forward(indices)
-            logits = logits[:, :, i] / temperature
+            start = max(0, i - self.receptive_field)
+            logits = self.forward(indices[:, start : i + 1])[:, :, -1] / temperature
             probs = torch.softmax(logits, dim=-1)
             indices[:, i] = torch.multinomial(probs, num_samples=1).squeeze(-1)
         return indices
@@ -708,7 +713,9 @@ class PriorConfig:
     """Configuration for PixelCNN prior model."""
     num_embeddings: int = 512
     hidden_dim: int = 128
-    num_layers: int = 3
+    num_layers: int = 10
+    kernel_size: int = 2
+    dilation_cycle: int = 10  # dilations 1, 2, 4, ..., 512 -> receptive field of 1024 codes
     lr: float = 1e-3
     b1: float = 0.9
     b2: float = 0.999
@@ -732,6 +739,8 @@ class PriorLightning(pl.LightningModule):
             num_embeddings=config.num_embeddings,
             hidden_dim=config.hidden_dim,
             num_layers=config.num_layers,
+            kernel_size=config.kernel_size,
+            dilation_cycle=config.dilation_cycle,
         )
 
         self.vqvae: VQVAELightning | None = None
@@ -766,7 +775,8 @@ class PriorLightning(pl.LightningModule):
             indices = self.vqvae.encode_to_indices(ecgs)
 
         logits = self.prior(indices)
-        loss = prior_loss(logits[:, :, :-1], indices[:, 1:])
+        # Logits at position t predict code t from codes < t (no target shift)
+        loss = prior_loss(logits, indices)
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
@@ -778,7 +788,8 @@ class PriorLightning(pl.LightningModule):
             indices = self.vqvae.encode_to_indices(ecgs)
 
         logits = self.prior(indices)
-        loss = prior_loss(logits[:, :, :-1], indices[:, 1:])
+        # Logits at position t predict code t from codes < t (no target shift)
+        loss = prior_loss(logits, indices)
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         return loss
@@ -1145,6 +1156,8 @@ def train_stage2_prior(args):
         num_embeddings=args.num_embeddings,
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
+        kernel_size=args.kernel_size,
+        dilation_cycle=args.dilation_cycle,
         lr=args.lr,
         b1=args.b1,
         b2=args.b2,
@@ -1189,6 +1202,8 @@ def train_stage2_prior(args):
                     "num_embeddings": args.num_embeddings,
                     "hidden_dim": args.hidden_dim,
                     "num_layers": args.num_layers,
+                    "kernel_size": args.kernel_size,
+                    "dilation_cycle": args.dilation_cycle,
                     "seq_length": args.seq_length,
                     "lr": args.lr,
                     "batch_size": args.batch_size,
@@ -1295,7 +1310,9 @@ def parse_args():
 
     # Model (Stage 2)
     parser.add_argument("--hidden-dim", type=int, default=128, help="Hidden dimension for PixelCNN")
-    parser.add_argument("--num-layers", type=int, default=3, help="Number of gated conv layers")
+    parser.add_argument("--num-layers", type=int, default=10, help="Number of gated causal conv layers")
+    parser.add_argument("--kernel-size", type=int, default=2, help="Kernel size of the causal convolutions")
+    parser.add_argument("--dilation-cycle", type=int, default=10, help="Layers after which the dilation resets to 1")
     parser.add_argument("--vqvae-checkpoint", type=str, default=None, help="Path to VQ-VAE checkpoint (Stage 2)")
 
     # Training

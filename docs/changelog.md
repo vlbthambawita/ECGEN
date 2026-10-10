@@ -1,3 +1,32 @@
+# Changes Summary - PixelCNN Prior Alignment and Receptive Field
+
+## Overview
+
+Two fixes to the VQ-VAE stage-2 prior. **Prior checkpoints from before this change use the old architecture and must be retrained**; stage-1 VQ-VAE checkpoints are unaffected.
+
+- **Off-by-one:** the mask-A layer already excluded the current position, and training also shifted the targets (`logits[:, :, :-1]` vs `indices[:, 1:]`), so logit `t` learned code `t+1` while sampling drew code `t` from logit `t`. Logits at `t` now predict code `t` from codes `< t` in both training and sampling.
+- **Receptive field:** the prior used undilated kernel-3 masked convolutions, so each code saw only the previous `num_layers` codes (3 codes, about 48 ms). It now uses WaveNet-style residual gated causal convolutions with dilations 1, 2, 4, ..., 512, a receptive field of 1024 codes, which covers the 625 codes of a 5000-sample ECG.
+
+---
+
+## Modified Files
+
+- **`models/vqvae/pixelcnn_prior.py`** (MODIFIED)
+  - `GatedMaskedConv1d` replaced by `CausalGatedBlock` (residual + skip outputs)
+  - `PixelCNNPrior` shifts the embedded codes right by one, stacks dilated causal blocks, and exposes `receptive_field`; `sample()` only feeds the last `receptive_field` codes per step
+- **`models/vqvae/prior_lightning.py`** (MODIFIED)
+  - New `compute_loss(indices)` used by training and validation, with no target shift
+- **`models/vqvae/config.py`, `scripts/train/train_prior_mimic.py`, `configs/experiments/prior_mimic.yaml`, `configs/model/vqvae/prior_base.yaml`** (MODIFIED)
+  - `num_layers` default 3 -> 10; new `kernel_size` (2) and `dilation_cycle` (10), also as `--kernel-size` / `--dilation-cycle`
+- **`training/losses/vqvae_losses.py`** (MODIFIED)
+  - `prior_loss` reshapes targets instead of `view`, so non-contiguous code tensors work
+- **`single_file/train_vqvae_standalone.py`, `single_file/run_train_vqvae.sh`** (MODIFIED)
+  - Same changes in the standalone copy
+- **`tests/test_models/test_pixelcnn_prior.py`** (NEW)
+  - Causality, exact receptive field, cropped-context sampling, and an end-to-end train/sample alignment test
+
+---
+
 # Changes Summary - Prior Sample Length Fix
 
 ## Overview

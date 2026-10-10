@@ -57,7 +57,7 @@ def prior_loss(
     logits = logits.view(-1, num_embeddings)  # [B*L, num_embeddings]
     
     # Flatten targets: [B, L] -> [B*L]
-    targets = targets.view(-1)
+    targets = targets.reshape(-1)
     
     # Cross-entropy loss
     loss = F.cross_entropy(logits, targets, reduction="mean")

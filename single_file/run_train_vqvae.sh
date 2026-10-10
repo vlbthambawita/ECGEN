@@ -36,7 +36,7 @@ SEQ_LENGTH="${SEQ_LENGTH:-5000}"
 
 # Model settings (Stage 2)
 HIDDEN_DIM="${HIDDEN_DIM:-128}"
-NUM_LAYERS="${NUM_LAYERS:-3}"
+NUM_LAYERS="${NUM_LAYERS:-10}"
 
 # Training settings
 LR_STAGE1="${LR_STAGE1:-0.0001}"

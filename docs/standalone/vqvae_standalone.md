@@ -105,7 +105,7 @@ All variables are optional. The defaults below are copied from the script.
     | `COMMITMENT_COST` | `0.25` | `--commitment-cost` (stage 1) |
     | `SEQ_LENGTH` | `5000` | `--seq-length` (both) |
     | `HIDDEN_DIM` | `128` | `--hidden-dim` (stage 2) |
-    | `NUM_LAYERS` | `3` | `--num-layers` (stage 2) |
+    | `NUM_LAYERS` | `10` | `--num-layers` (stage 2). There are no variables for `--kernel-size` or `--dilation-cycle`; their script defaults (2 and 10) are used |
     | `VQVAE_CHECKPOINT` | unset | `--vqvae-checkpoint`; required for `2`, set automatically by `both` |
 
 === "Training"
@@ -193,7 +193,9 @@ python train_vqvae_standalone.py --stage 2 \
 | `--commitment-cost` | `0.25` | Stage 1 |
 | `--seq-length` | `5000` | Must be divisible by 8 |
 | `--hidden-dim` | `128` | Stage 2 |
-| `--num-layers` | `3` | Stage 2: one mask-A layer + (n−1) mask-B layers |
+| `--num-layers` | `10` | Stage 2: number of `CausalGatedBlock` layers |
+| `--kernel-size` | `2` | Stage 2: kernel size of the causal convolutions |
+| `--dilation-cycle` | `10` | Stage 2: layer `i` uses dilation `2 ** (i % dilation_cycle)` |
 | `--vqvae-checkpoint` | `None` | **Required** for stage 2 |
 | `--lr` | `1e-4` | In stage 2, a value of exactly `1e-4` is silently replaced by `1e-3` |
 | `--b1` / `--b2` | `0.9` / `0.999` | Adam betas |
@@ -266,11 +268,19 @@ Optimizer: Adam(`lr`, `(b1, b2)`), with no scheduler.
 
 ```text
 indices [B, 625]  (from the frozen stage-1 encoder, computed on the fly each batch)
- └─ Embedding(K, hidden_dim) → GatedMaskedConv1d("A") → GatedMaskedConv1d("B") × (num_layers-1) → Conv1d 1×1
- logits [B, K, 625]
+ └─ Embedding(K, hidden_dim) → shift right by one (zeros at t = 0)
+ └─ CausalGatedBlock × num_layers   (left-padded causal conv, kernel 2, dilation 2^(i % dilation_cycle) = 1, 2, …, 512;
+                                     tanh·sigmoid gate → 1×1 residual (+ input) and 1×1 skip)
+ └─ Σ skips → ReLU → Conv1d 1×1 → ReLU → Conv1d 1×1
+ logits [B, K, 625]   (logit t predicts code t from codes < t; receptive field 1024 codes)
 ```
 
-Loss: cross-entropy between `logits[:, :, :-1]` and `indices[:, 1:]`. The stage-1 model is frozen (`eval()` + `freeze()`).
+With default settings the prior has about 1.14 M parameters. `sample()` draws the 625 codes one at a time and feeds each step only the last `receptive_field` codes.
+
+Loss: `prior_loss(logits, indices)`, the cross-entropy of each code given the codes before it (no target shift, so training matches sampling). The stage-1 model is frozen (`eval()` + `freeze()`).
+
+!!! warning "Old stage-2 checkpoints"
+    Prior checkpoints saved before the switch from mask-A/B `GatedMaskedConv1d` layers to `CausalGatedBlock` have different `state_dict` keys and cannot be loaded. Retrain stage 2. Stage-1 checkpoints are unaffected.
 
 ### Callbacks and logging
 
@@ -378,7 +388,6 @@ The `nn.Module` attribute names match (`vqvae.encoder`, `vqvae.vq`, `vqvae.decod
 
 The Markdown files in `single_file/` predate several changes. Compared with the code:
 
-- **Latent size**: the notes say `[B, 64, 312]` and "downsample 16x". The actual size is `[B, 64, 625]`, a downsampling factor of 8.
 - **`WANDB_ENABLED`**: `WANDB_GUIDE.md` lists the default as `false`. The wrapper default is `true`.
 - **W&B support**: `FIXES.md` says W&B "was never included". It is included, but stage 1 does not attach the logger.
 - **`--resume`**: shown in `README.md`, but the flag does not exist.
