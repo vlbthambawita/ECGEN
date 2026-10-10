@@ -18,7 +18,7 @@ The VQ-VAE consists of three main components:
 - **Encoder**: Compresses ECG signals to continuous latent space
   - Uses `Encoder1D` from `models/components/encoders.py`
   - Input: `[B, 12, 5000]` ECG signals
-  - Output: `[B, 64, 312]` continuous latent codes
+  - Output: `[B, 64, 625]` continuous latent codes
 
 - **Vector Quantizer**: Discretizes continuous latents using a learned codebook
   - Codebook size: 512 discrete codes
@@ -28,7 +28,7 @@ The VQ-VAE consists of three main components:
 
 - **Decoder**: Reconstructs ECG from quantized latents
   - Uses `Decoder1D` from `models/components/decoders.py`
-  - Input: `[B, 64, 312]` quantized latent codes
+  - Input: `[B, 64, 625]` quantized latent codes
   - Output: `[B, 12, 5000]` reconstructed ECG
 
 ### PixelCNN Prior (Stage 2)
@@ -36,8 +36,8 @@ The VQ-VAE consists of three main components:
 The prior model learns the distribution p(z) over discrete codes:
 
 - **Architecture**: Autoregressive PixelCNN with gated masked convolutions
-- **Input**: Discrete code indices `[B, 312]`
-- **Output**: Logits over codebook `[B, 512, 312]`
+- **Input**: Discrete code indices `[B, 625]`
+- **Output**: Logits over codebook `[B, 512, 625]`
 - **Training**: Cross-entropy loss for next-code prediction
 
 ## Key Differences from Standard VAE
@@ -125,7 +125,7 @@ samples = prior.sample(
 
 ```python
 # Encode ECG to discrete indices
-indices = vqvae.encode_to_indices(ecg_signals)  # [B, 312]
+indices = vqvae.encode_to_indices(ecg_signals)  # [B, 625]
 
 # Decode from indices
 reconstructed = vqvae.decode_from_indices(indices)
@@ -203,7 +203,7 @@ prior = PixelCNNPrior(
 logits = prior(indices)
 
 # Sample autoregressively
-sampled_indices = prior.sample(batch_size=16, latent_length=312)
+sampled_indices = prior.sample(batch_size=16, latent_length=625)
 ```
 
 ## Performance Tips

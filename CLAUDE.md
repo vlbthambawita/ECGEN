@@ -45,7 +45,7 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.pa
 
 **Checkpoint loading:** wrappers save the config as flat hyperparameters (`save_hyperparameters(config.__dict__)`) and accept `config=None, **kwargs` via `utils.config.resolve_config`, so plain `X.load_from_checkpoint(path)` works; keep that signature on new wrappers. `PriorLightning` records the stage-1 config in `vqvae_config`, so prior checkpoints restore the frozen VQ-VAE from their own weights. `tests/test_models/test_checkpoint_loading.py` covers this.
 
-**Known pitfalls:** The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default), but `PriorLightning.sample` still assumes 16×. In the train scripts, YAML values override CLI flags (except the prior's `--vqvae-checkpoint`), and the YAML `callbacks:` section is ignored.
+**Known pitfalls:** The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default) — use `VQVAELightning.downsample_factor` / `latent_length()` rather than hard-coding it. In the train scripts, YAML values override CLI flags (except the prior's `--vqvae-checkpoint`), and the YAML `callbacks:` section is ignored.
 
 ## Documentation
 

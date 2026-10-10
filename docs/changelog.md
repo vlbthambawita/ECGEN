@@ -1,3 +1,26 @@
+# Changes Summary - Prior Sample Length Fix
+
+## Overview
+
+`PriorLightning.sample()` computed the latent length as `seq_length // 16`, but the VQ-VAE downsamples by `2 ** (len(channel_multipliers) - 1)` (8 by default), so samples came out 2496 long instead of 5000. Sampling now derives the latent length from the VQ-VAE and returns the requested length.
+
+---
+
+## Modified Files
+
+- **`models/vqvae/vqvae_lightning.py`** (MODIFIED)
+  - New `downsample_factor` property and `latent_length(seq_length)`, which raises `ValueError` when `seq_length` is not a multiple of the factor; `sample()` uses it
+- **`models/vqvae/prior_lightning.py`** (MODIFIED)
+  - `sample()` uses `self.vqvae.latent_length(seq_length)` instead of `seq_length // 16`
+- **`models/vqvae/pixelcnn_prior.py`** (MODIFIED)
+  - `sample()` default `latent_length` is 625 (was 312)
+- **`single_file/train_vqvae_standalone.py`** (MODIFIED)
+  - Same fix in the standalone copy
+- **`tests/test_models/test_vqvae_sampling.py`** (NEW)
+  - Output-length tests for several `channel_multipliers`
+
+---
+
 # Changes Summary - Checkpoint Loading Fix
 
 ## Overview

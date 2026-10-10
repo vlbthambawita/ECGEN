@@ -135,9 +135,7 @@ class PriorLightning(pl.LightningModule):
         self.prior.eval()
         device = next(self.prior.parameters()).device
 
-        # Calculate latent length from VQ-VAE architecture
-        # Assumes 4 downsampling stages with stride 2 each -> 16x downsampling
-        latent_length = seq_length // 16
+        latent_length = self.vqvae.latent_length(seq_length)
 
         # Sample discrete codes from prior
         indices = self.prior.sample(

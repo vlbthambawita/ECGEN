@@ -322,7 +322,7 @@ When `--wandb` is set, the script creates a `WandbLogger` with `save_dir=<run_di
 
 `VQVAELightning` and `PriorLightning` rebuild their config from the flat hyperparameters stored in the checkpoint, so a plain `load_from_checkpoint(path)` works (passing `config=` explicitly is still accepted). When stage 2 loads the stage-1 checkpoint, it records the VQ-VAE's config as `vqvae_config` in the prior's hyperparameters; together with the `vqvae.*` weights already stored in the prior checkpoint, this makes the prior checkpoint self-contained, so loading it does not read the stage-1 file. (Prior checkpoints saved before `vqvae_config` was added still load the VQ-VAE from the stored `vqvae_checkpoint` path.)
 
-`PriorLightning.sample()` still computes the latent length as `seq_length // 16`, which gives 312 codes and a **2496-sample** output for `seq_length=5000`. The encoder downsamples by 8, so call the prior's sampler with `latent_length = seq_length // 8`:
+`PriorLightning.sample()` derives the latent length from the VQ-VAE (`VQVAELightning.latent_length(seq_length)`, a downsampling factor of 8 by default), so samples have the requested length. `seq_length` must be a multiple of that factor; otherwise it raises `ValueError`.
 
 ```python
 # run from inside single_file/
@@ -339,10 +339,7 @@ prior = PriorLightning.load_from_checkpoint(
     "runs/prior_mimic_standalone/seed_42/checkpoints/last.ckpt", map_location="cuda"
 ).eval()
 
-seq_length = 5000
-codes = prior.prior.sample(batch_size=16, latent_length=seq_length // 8,
-                           temperature=1.0, device="cuda")
-samples = prior.vqvae.decode_from_indices(codes)   # [16, 12, 5000], per-sample normalized units
+samples = prior.sample(n_samples=16, seq_length=5000, temperature=1.0)  # [16, 12, 5000], per-sample normalized units
 torch.save(samples.cpu(), "generated_ecgs.pt")
 ```
 
@@ -360,7 +357,7 @@ torch.save(samples.cpu(), "generated_ecgs.pt")
 | Resume | not supported | `--resume <ckpt>` |
 | W&B | stage 1 logger not attached (bug) | attached via `logger=loggers_list` |
 | Default run names | `vqvae_mimic_standalone`, `prior_mimic_standalone` (wrapper) | `vqvae_mimic`, `prior_mimic` |
-| Shared behaviour | same architecture, defaults, metric names, checkpoint naming, config-from-hyperparameters checkpoint loading (self-contained prior checkpoints), and the `seq_length // 16` sampling issue | |
+| Shared behaviour | same architecture, defaults, metric names, checkpoint naming, config-from-hyperparameters checkpoint loading (self-contained prior checkpoints), and sampling via `VQVAELightning.latent_length()` | |
 
 The `nn.Module` attribute names match (`vqvae.encoder`, `vqvae.vq`, `vqvae.decoder`, `prior.*`), so state-dict weights can in principle be moved between the two by loading the `state_dict` into the other class. `load_from_checkpoint` across implementations is not supported. For the packaged workflow, see [VQ-VAE](../models/vqvae.md) and [VQ-VAE training](../training/vqvae_training.md).
 
@@ -385,7 +382,7 @@ The Markdown files in `single_file/` predate several changes. Compared with the 
 - **`WANDB_ENABLED`**: `WANDB_GUIDE.md` lists the default as `false`. The wrapper default is `true`.
 - **W&B support**: `FIXES.md` says W&B "was never included". It is included, but stage 1 does not attach the logger.
 - **`--resume`**: shown in `README.md`, but the flag does not exist.
-- **Sampling snippet**: `PriorLightning.load_from_checkpoint(...)` now loads, but `model.sample(...)` returns `[16, 12, 2496]`, not `[16, 12, 5000]`. Use the snippet [above](#loading-checkpoints-and-sampling).
+- **Sampling snippet**: works as written, returning `[16, 12, 5000]`. See [above](#loading-checkpoints-and-sampling).
 - **Low codebook usage → "increase commitment cost"**: with the β placement in this code, β scales the codebook update, not encoder commitment.
 - The README omits `LOG_EVERY_N_STEPS` and `CHECK_VAL_EVERY_N_EPOCH`, which the wrapper does support.
 

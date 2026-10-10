@@ -89,6 +89,20 @@ class VQVAELightning(pl.LightningModule):
 
         return total_loss
 
+    @property
+    def downsample_factor(self) -> int:
+        """Temporal downsampling between ECG and latent (one stride-2 stage per multiplier after the first)."""
+        return 2 ** (len(self.config.channel_multipliers) - 1)
+
+    def latent_length(self, seq_length: int) -> int:
+        """Number of latent codes for an ECG of ``seq_length`` samples."""
+        if seq_length % self.downsample_factor != 0:
+            raise ValueError(
+                f"seq_length={seq_length} must be a multiple of the downsampling factor "
+                f"{self.downsample_factor}; decoded samples would be shorter"
+            )
+        return seq_length // self.downsample_factor
+
     @torch.no_grad()
     def reconstruct(self, x: Tensor) -> Tensor:
         """Reconstruct input ECG signals."""
@@ -125,8 +139,7 @@ class VQVAELightning(pl.LightningModule):
         self.vqvae.eval()
         device = next(self.vqvae.parameters()).device
 
-        # Calculate latent length based on downsampling
-        latent_length = seq_length // (2 ** (len(self.config.channel_multipliers) - 1))
+        latent_length = self.latent_length(seq_length)
         
         # Random indices (not a good prior!)
         indices = torch.randint(

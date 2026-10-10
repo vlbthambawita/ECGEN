@@ -86,7 +86,7 @@ these parts:
   the current and future positions. Mask B hides only future positions.
 - A 1×1 `Conv1d` maps `hidden_dim` to `num_embeddings` logits.
 - `forward(indices [B, L])` returns `logits [B, num_embeddings, L]`.
-- `sample(batch_size=1, latent_length=312, temperature=1.0, device="cuda")` fills a zero tensor
+- `sample(batch_size=1, latent_length=625, temperature=1.0, device="cuda")` fills a zero tensor
   one position at a time, drawing each code from `softmax(logits / temperature)`.
 
 !!! note "Small receptive field"
@@ -117,14 +117,14 @@ With the default `(1, 2, 4, 4)` the factor is **8**, which gives these shapes:
 `seq_length` should be divisible by the factor, or the reconstruction will be shorter than
 the input.
 
-!!! warning "`PriorLightning.sample()` assumes a factor of 16"
-    `PriorLightning.sample()` computes `latent_length = seq_length // 16`, which is 312 for
-    5000 samples. The model actually downsamples by 8, so the decoder returns
-    `[B, 12, 2496]` rather than `[B, 12, 5000]`. `VQVAELightning.sample()` uses the correct
-    formula. Until this is fixed, call `PixelCNNPrior.sample()` with
-    `latent_length = seq_length // 8`, as in the [sampling example](#sampling-example) below.
-    The `[B, 312]` shapes in `models/vqvae/README.md` and `VQVAE_IMPLEMENTATION.md` come from
-    the same mistake.
+`VQVAELightning.downsample_factor` returns this factor, and
+`VQVAELightning.latent_length(seq_length)` returns `seq_length // factor`. It raises
+`ValueError` if `seq_length` is not a multiple of the factor. `VQVAELightning.sample()` and
+`PriorLightning.sample()` both use it, so samples always have the requested length.
+
+!!! note
+    The `[B, 312]` shapes in `models/vqvae/README.md` and `VQVAE_IMPLEMENTATION.md` assume a
+    factor of 16. The real latent length for 5000 samples is 625.
 
 With the default config, the stage-1 model has about 6.38 M parameters and the PixelCNN prior
 has about 0.43 M.
@@ -293,10 +293,6 @@ x_hat = vqvae.decode_from_indices(indices)   # [4, 12, 5000]
 
 ### Sampling example
 
-`PriorLightning.sample()` still computes the latent length as `seq_length // 16` (see the
-factor-16 warning above), so this example calls the PixelCNN sampler directly with the correct
-latent length and decodes with the prior's own frozen VQ-VAE.
-
 ```python
 import torch
 from models.vqvae import PriorLightning
@@ -307,18 +303,18 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 prior = PriorLightning.load_from_checkpoint(
     "runs/prior_mimic/seed_42/checkpoints/last.ckpt", map_location=device
 ).eval()
-vqvae = prior.vqvae
 
-seq_length = 5000
-factor = 2 ** (len(vqvae.config.channel_multipliers) - 1)    # 8 for (1, 2, 4, 4)
+ecgs = prior.sample(
+    n_samples=16,
+    seq_length=5000,      # must be a multiple of the VQ-VAE downsampling factor (8)
+    temperature=1.0,      # >1 more diverse, <1 more conservative
+)                         # [16, 12, 5000]
 
+# Or step by step: sample 625 codes, then decode them
 indices = prior.prior.sample(
-    batch_size=16,
-    latent_length=seq_length // factor,   # 625
-    temperature=1.0,                      # >1 more diverse, <1 more conservative
-    device=device,
-)                                         # [16, 625]
-ecgs = vqvae.decode_from_indices(indices) # [16, 12, 5000]
+    batch_size=16, latent_length=prior.vqvae.latent_length(5000), device=device
+)                                               # [16, 625]
+ecgs = prior.vqvae.decode_from_indices(indices) # [16, 12, 5000]
 ```
 
 Sampling is sequential over the 625 latent positions. Each step runs a full forward pass of the

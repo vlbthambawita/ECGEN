@@ -142,7 +142,7 @@ class PixelCNNPrior(nn.Module):
     def sample(
         self,
         batch_size: int = 1,
-        latent_length: int = 312,
+        latent_length: int = 625,  # 5000 samples / 8x VQ-VAE downsampling
         temperature: float = 1.0,
         device: str = "cuda",
     ) -> Tensor:

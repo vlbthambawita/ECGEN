@@ -408,7 +408,7 @@ class PixelCNNPrior(nn.Module):
     def sample(
         self,
         batch_size: int = 1,
-        latent_length: int = 312,
+        latent_length: int = 625,  # 5000 samples / 8x VQ-VAE downsampling
         temperature: float = 1.0,
         device: str = "cuda",
     ) -> Tensor:
@@ -671,6 +671,19 @@ class VQVAELightning(pl.LightningModule):
 
         return total_loss
 
+    @property
+    def downsample_factor(self) -> int:
+        """Temporal downsampling between ECG and latent (one stride-2 stage per multiplier after the first)."""
+        return 2 ** (len(self.config.channel_multipliers) - 1)
+
+    def latent_length(self, seq_length: int) -> int:
+        if seq_length % self.downsample_factor != 0:
+            raise ValueError(
+                f"seq_length={seq_length} must be a multiple of the downsampling factor "
+                f"{self.downsample_factor}; decoded samples would be shorter"
+            )
+        return seq_length // self.downsample_factor
+
     @torch.no_grad()
     def encode_to_indices(self, x: Tensor) -> Tensor:
         self.vqvae.eval()
@@ -781,7 +794,7 @@ class PriorLightning(pl.LightningModule):
             raise RuntimeError("VQ-VAE not loaded")
         self.prior.eval()
         device = next(self.prior.parameters()).device
-        latent_length = seq_length // 16
+        latent_length = self.vqvae.latent_length(seq_length)
         indices = self.prior.sample(
             batch_size=n_samples,
             latent_length=latent_length,
