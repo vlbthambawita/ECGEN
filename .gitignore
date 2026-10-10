@@ -24,6 +24,7 @@ data/processed/
 build/
 dist/
 *.egg-info/
+src/ecgen/_version.py
 
 # IDE
 .vscode/
@@ -36,6 +37,11 @@ notebooks/**/*.ipynb_checkpoints
 # Test outputs
 test_output/
 .pytest_cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
 
 # Misc
 *.log

@@ -1,0 +1,25 @@
+# HuggingFace checkpoint upload configuration
+# Repository: https://huggingface.co/{hf_username}/ECGEN
+
+hf_repo_id: "vlbthambawita/ECGEN"          # HuggingFace repo name (username/ECGEN or org/ECGEN)
+hf_repo_type: "model"        # "model", "dataset", or "space"
+commit_message: "Upload model checkpoints"
+private: false               # Set to true to make the repo private on creation
+
+# List of checkpoints to upload.
+# Each entry:
+#   local_path  - absolute or relative path to file or directory on disk
+#   repo_path   - destination path inside the HF repo (supports subcategories)
+#   description - optional human-readable note (not uploaded, just for reference)
+
+checkpoints:
+  - local_path: "/work/vajira/DL2026/Pulse2Pulse/output/pulse2pulse_exp_ptbxl_full/checkpoints/pulse2pulse_exp_ptbxl_full_epoch:900.pt"
+    repo_path: "pulse2pulse/ptbxl/pulse2pulse_exp_ptbxl_full_epoch:900.pt"
+    description: "Pulse2Pulse checkpoint from epoch 900 on PTB-XL"
+
+ 
+
+  # Directory upload example — uploads the entire directory recursively
+  # - local_path: "/work/vajira/DL2026/ECGEN/runs/vae/mimic"
+  #   repo_path: "vae/mimic"
+  #   description: "All VAE MIMIC checkpoints"

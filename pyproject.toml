@@ -1,11 +1,13 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=61", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecgen"
-version = "0.2.0"
+dynamic = ["version"]
 description = "ECG generation and modeling with VAE, GAN, Diffusion, and SSM models"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = [
     "torch>=1.10",
@@ -14,12 +16,12 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "wfdb",
-    "matplotlib",
-    "scipy",
-    "numpy",
 ]
 
 [project.optional-dependencies]
+hf = ["huggingface_hub>=0.20", "python-dotenv>=1.0"]
+plot = ["cairosvg>=2.5"]
+all  = ["huggingface_hub>=0.20", "python-dotenv>=1.0", "cairosvg>=2.5"]
 dev = [
     "pytest",
     "black",
@@ -27,6 +29,16 @@ dev = [
     "mypy",
 ]
 
-[tool.setuptools]
-packages = ["models", "data", "training", "evaluation", "utils", "visualization"]
+[project.urls]
+Homepage = "https://github.com/vlbthambawita/ECGEN"
 
+# Only the ecgen package (src/) is published. The research packages at the repo
+# root (models, data, training, ...) are used from a checkout, not installed.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+version_file = "src/ecgen/_version.py"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

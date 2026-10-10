@@ -6,12 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ECGEN is a research framework for generative modeling of 12-lead ECGs (MIMIC-IV-ECG; PTB-XL planned), built on PyTorch Lightning. Implemented model families: VAE, VQ-VAE + PixelCNN prior, and Pulse2Pulse GAN. `models/diffusion/` and `models/ssm/` are placeholders.
 
+The repo also ships the `ecgen` package (`src/ecgen/`) published to PyPI — `ecgen.generate`, `ecgen.plot_ecg`, and HF upload helpers; see "Published `ecgen` package" below.
+
 ## Commands
 
 ```bash
-pip install -e .            # installs top-level packages: models, data, training, evaluation, utils, visualization
-pip install -e ".[dev]"     # + pytest, black, flake8, mypy
+pip install -e ".[dev]"     # installs only src/ecgen (+ pytest, black, flake8, mypy); extras: [hf], [plot], [all]
 
+# The top-level research packages (models, data, training, ...) are NOT installed;
+# run from the repo root. pytest gets them via [tool.pytest.ini_options] pythonpath = ["."].
 pytest tests/                                          # all tests
 pytest tests/test_models/test_vae.py::<test_name>      # single test
 black . && flake8 .
@@ -30,7 +33,7 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.pa
 
 **Two code layouts coexist — be careful which one you touch.**
 - **New layout (current):** top-level packages `models/`, `data/`, `training/`, `evaluation/`, `visualization/`, `utils/`. Imports look like `from models.vqvae import VQVAELightning`, `from data.datasets.mimic.dataset import MIMICIVECGDataset`. See `MIGRATION_GUIDE.md` for the old→new import mapping.
-- **Legacy layout:** `src/ecgen/` (imported as `ecgen.*`). It is *not* in `pyproject.toml`'s package list, yet some code still imports it: `tests/test_models/test_vae.py`, `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_models_only.py`, `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`), `training/trainers/gan_trainer.py`, and `data/datasets/mimic/pulse2pulse_datamodule.py`. Those paths only work with `PYTHONPATH=src` (the scripts' own `sys.path` hack resolves to the nonexistent `scripts/src`).
+- **`src/ecgen/` (imported as `ecgen.*`):** the published PyPI package (the only thing `pyproject.toml` packages). It contains an older copy of the VAE/Pulse2Pulse model, data, and training code plus the newer `generate`/`plot`/`f` modules. Some research code still imports its older parts: `tests/test_models/test_vae.py`, `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_models_only.py`, `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`), `training/trainers/gan_trainer.py`, and `data/datasets/mimic/pulse2pulse_datamodule.py`. Those paths need `ecgen` installed (`pip install -e .`) or `PYTHONPATH=src` (the scripts' own `sys.path` hack resolves to the nonexistent `scripts/src`).
 - **`single_file/`:** a self-contained VQ-VAE (both stages) in `train_vqvae_standalone.py` with its own model/data/training code and `run_train_vqvae.sh`. Independent of the packages above; changes to `models/vqvae/` are not reflected there and vice versa.
 
 **Model package pattern** (`models/vae/`, `models/vqvae/`): a dataclass config (`config.py`), a plain `nn.Module` (`*_1d.py`), and a `LightningModule` wrapper (`*_lightning.py`) that owns loss, optimizers, and `sample()`. Shared conv blocks live in `models/components/`; losses in `training/losses/` (`vae_losses.py`, `vqvae_losses.py`, `gan_losses.py`).
@@ -50,3 +53,11 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.pa
 ## Documentation
 
 MkDocs Material site in `docs/` (config: `mkdocs.yml`; API pages in `docs/api/` are rendered by mkdocstrings from Google-style docstrings). Preview with `pip install -r requirements-docs.txt && mkdocs serve`; CI (`.github/workflows/docs.yml`) runs `mkdocs build --strict` and publishes to the `gh-pages` branch on pushes to `main`/`simple`. New pages must be added to `nav` in `mkdocs.yml`.
+
+## Published `ecgen` package
+
+- **Generation:** `ecgen.generate(model_path, n_samples, output_dir, ...)` (`src/ecgen/generate.py`) loads a Pulse2Pulse checkpoint and writes one CSV per sample (5000 rows × 8 leads `I, II, V1–V6`), optionally with a plot. Original Pulse2Pulse-repo checkpoints use `Conv1dTrans`/`ppfilter1` keys, which `_remap_state_dict()` rewrites. `hf://<repo_id>/<path>` model paths go through `_resolve_model_path()`, which uses `HF_TOKEN` from the environment or a `.env` in CWD. Use `denorm=6000.0` for models trained on `ECGDataSimple`.
+- **Plots:** `ecgen.plot_ecg` (`src/ecgen/plot.py`) renders an ECG grid sheet as self-contained D3 HTML or SVG (pure Python), or PDF via `cairosvg` (`ecgen[plot]`).
+- **HF upload:** `ecgen.f.upload_hf(config_or_dict, dry_run=...)` / `upload_hf_single(...)` (`src/ecgen/f/upload_hf.py`, needs `ecgen[hf]`); manifest in `configs/upload_checkpoints.yaml`; CLI `scripts/upload_checkpoints_to_hf.py [--dry-run]`. `upload_hf` raises `RuntimeError` on failure rather than exiting.
+- **Releasing:** the version comes from git tags via `setuptools-scm` (no `__version__` literal; `src/ecgen/_version.py` is generated and gitignored). Pushing a `v*` tag runs `.github/workflows/publish.yml`, which publishes to PyPI with OIDC trusted publishing. Don't add the top-level research packages to the wheel — their generic names (`models`, `data`, `utils`) would clash in site-packages.
+- `tests/test_upload_hf.py` covers the upload helpers.
