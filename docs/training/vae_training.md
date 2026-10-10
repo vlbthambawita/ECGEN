@@ -169,12 +169,9 @@ tensorboard --logdir runs/vae_mimic/seed_42/tb
 ## Using a trained model
 
 ```python
-import torch
-from models.vae import VAELightning, VAEConfig
+from models.vae import VAELightning
 
-ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
-model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
-model.load_state_dict(ckpt["state_dict"])
+model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()
 
 samples = model.sample(n_samples=16, seq_length=5000)   # generate

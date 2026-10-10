@@ -131,8 +131,9 @@ has about 0.43 M.
 
 ## Configuration
 
-Both configs are dataclasses in `models/vqvae/config.py`. The Lightning wrappers accept either
-the dataclass or a plain `dict`, which is converted with `Config(**dict)`.
+Both configs are dataclasses in `models/vqvae/config.py`. The Lightning wrappers accept the
+dataclass, a plain `dict` (converted with `Config(**dict)`), or the fields as flat keyword
+arguments (`VQVAELightning(num_embeddings=256)`), which is what `load_from_checkpoint` uses.
 
 ### `VQVAEConfig`
 
@@ -159,7 +160,8 @@ the dataclass or a plain `dict`, which is converted with `Config(**dict)`.
 | `lr` | `float` | `1e-3` | Adam learning rate |
 | `b1` | `float` | `0.9` | Adam β1 |
 | `b2` | `float` | `0.999` | Adam β2 |
-| `vqvae_checkpoint` | `str` | `""` | Path to the stage-1 checkpoint. If non-empty, it is loaded and frozen in `__init__` |
+| `vqvae_checkpoint` | `str` | `""` | Path to the stage-1 checkpoint. If non-empty (and `vqvae_config` is unset), it is loaded and frozen in `__init__` |
+| `vqvae_config` | `dict \| None` | `None` | The VQ-VAE's config fields. Filled in automatically when `vqvae_checkpoint` is loaded, so prior checkpoints can be restored without the stage-1 file. If set, `__init__` builds the VQ-VAE from it instead of reading `vqvae_checkpoint` |
 
 `configs/model/vqvae/vqvae_1d_base.yaml` and `configs/model/vqvae/prior_base.yaml` list the
 same defaults as YAML fragments. See [VQ-VAE Training](../training/vqvae_training.md#configuration)
@@ -214,9 +216,15 @@ Logged metrics:
 ### `PriorLightning` (stage 2)
 
 `models/vqvae/prior_lightning.py`. Constructed as `PriorLightning(config)` and wraps a
-`PixelCNNPrior` in `self.prior`. If `config.vqvae_checkpoint` is non-empty, `__init__` loads it
-with `VQVAELightning.load_from_checkpoint`, calls `.eval()` and `.freeze()`, and stores it in
-`self.vqvae`. It raises `FileNotFoundError` if the path does not exist.
+`PixelCNNPrior` in `self.prior`. The frozen VQ-VAE in `self.vqvae` is set up in one of two ways:
+
+- If `config.vqvae_config` is set (the case when restoring a prior checkpoint), `__init__` builds
+  an untrained `VQVAELightning(config.vqvae_config)`, calls `.eval()` and `.freeze()`, and the
+  weights are then filled in from the prior checkpoint's own `state_dict`.
+- Otherwise, if `config.vqvae_checkpoint` is non-empty, `__init__` loads it with
+  `VQVAELightning.load_from_checkpoint(path, map_location="cpu")`, calls `.eval()` and
+  `.freeze()`, and records the VQ-VAE's config as `vqvae_config` in the prior's hyperparameters.
+  It raises `FileNotFoundError` if the path does not exist.
 
 | Method | Description |
 |---|---|
@@ -228,7 +236,8 @@ with `VQVAELightning.load_from_checkpoint`, calls `.eval()` and `.freeze()`, and
 Logged metrics: `train/loss` (per step and epoch), and `val/loss` and `val_loss` (per epoch).
 
 Because `self.vqvae` is a registered submodule, the frozen VQ-VAE weights are saved inside
-every prior checkpoint, under keys `vqvae.vqvae.*`.
+every prior checkpoint, under keys `vqvae.vqvae.*`. Together with the recorded `vqvae_config`,
+this makes a prior checkpoint self-contained (see [Loading checkpoints](#loading-checkpoints)).
 
 !!! warning "Training and sampling are off by one"
     Because of mask A, the logit at position `t` depends only on codes `< t`. `PixelCNNPrior.sample()`
@@ -239,24 +248,30 @@ every prior checkpoint, under keys `vqvae.vqvae.*`.
 
 ## Loading checkpoints
 
-!!! warning "`load_from_checkpoint` needs an explicit `config`"
-    Both wrappers call `self.save_hyperparameters(config.__dict__)`. That stores the config fields
-    as flat hyperparameters, and Lightning cannot map them back onto the single `config` argument.
-    As a result, `VQVAELightning.load_from_checkpoint(path)` raises
-    `TypeError: __init__() missing 1 required positional argument: 'config'`.
-    `PriorLightning` makes this call internally, so stage-2 training fails in the same way.
+Both wrappers accept either `config=` or the flat config fields as keyword arguments, which is
+how `save_hyperparameters(config.__dict__)` stores them. A plain `load_from_checkpoint(path)`
+therefore works, for checkpoints written before and after this was fixed:
 
-    Pass the config explicitly instead:
+```python
+from models.vqvae import VQVAELightning, PriorLightning
 
-    ```python
-    import torch
-    from models.vqvae import VQVAELightning, VQVAEConfig
+vqvae = VQVAELightning.load_from_checkpoint(
+    "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu"
+)
+prior = PriorLightning.load_from_checkpoint(
+    "runs/prior_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu"
+)
+```
 
-    hp = torch.load(path, map_location="cpu")["hyper_parameters"]
-    vqvae = VQVAELightning.load_from_checkpoint(
-        path, map_location="cpu", config=VQVAEConfig(**hp)
-    )
-    ```
+- Passing `config=VQVAEConfig(...)` / `config=PriorConfig(...)` explicitly still works and
+  takes precedence over the stored hyperparameters.
+- Unknown keyword arguments raise `TypeError: Unexpected VQVAEConfig fields: [...]` (or
+  `PriorConfig`).
+- A prior checkpoint stores `vqvae_config`, so `PriorLightning.load_from_checkpoint` rebuilds the
+  frozen VQ-VAE from the prior checkpoint's own weights and does **not** read the stage-1 file.
+  Prior checkpoints saved before `vqvae_config` was added lack this field and still load the
+  VQ-VAE from the stored `vqvae_checkpoint` path, so that file must exist (pass
+  `vqvae_checkpoint=<path>` to `load_from_checkpoint` if it has moved).
 
 ## Usage
 
@@ -264,12 +279,10 @@ every prior checkpoint, under keys `vqvae.vqvae.*`.
 
 ```python
 import torch
-from models.vqvae import VQVAELightning, VQVAEConfig
+from models.vqvae import VQVAELightning
 
-ckpt_path = "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"
-hp = torch.load(ckpt_path, map_location="cpu")["hyper_parameters"]
 vqvae = VQVAELightning.load_from_checkpoint(
-    ckpt_path, map_location="cpu", config=VQVAEConfig(**hp)
+    "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu"
 ).eval()
 
 x = torch.randn(4, 12, 5000)                 # [B, leads, samples]
@@ -280,36 +293,21 @@ x_hat = vqvae.decode_from_indices(indices)   # [4, 12, 5000]
 
 ### Sampling example
 
-This example works around both issues described above. It rebuilds the modules from the raw
-checkpoint dicts and calls the PixelCNN sampler with the correct latent length.
+`PriorLightning.sample()` still computes the latent length as `seq_length // 16` (see the
+factor-16 warning above), so this example calls the PixelCNN sampler directly with the correct
+latent length and decodes with the prior's own frozen VQ-VAE.
 
 ```python
 import torch
-from models.vqvae import VQVAELightning, VQVAEConfig, PriorLightning, PriorConfig
+from models.vqvae import PriorLightning
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-def load_vqvae(path: str) -> VQVAELightning:
-    ckpt = torch.load(path, map_location=device)
-    model = VQVAELightning(VQVAEConfig(**ckpt["hyper_parameters"]))
-    model.load_state_dict(ckpt["state_dict"])
-    return model.to(device).eval()
-
-
-def load_prior(path: str, vqvae: VQVAELightning) -> PriorLightning:
-    ckpt = torch.load(path, map_location=device)
-    # Don't re-load the VQ-VAE from the path stored in the hparams
-    hparams = {**ckpt["hyper_parameters"], "vqvae_checkpoint": ""}
-    prior = PriorLightning(PriorConfig(**hparams))
-    prior.vqvae = vqvae                       # prior ckpt also contains vqvae.* weights
-    prior.load_state_dict(ckpt["state_dict"])
-    prior.vqvae.freeze()
-    return prior.to(device).eval()
-
-
-vqvae = load_vqvae("runs/vqvae_mimic/seed_42/checkpoints/last.ckpt")
-prior = load_prior("runs/prior_mimic/seed_42/checkpoints/last.ckpt", vqvae)
+# The prior checkpoint also contains the frozen VQ-VAE (weights + config)
+prior = PriorLightning.load_from_checkpoint(
+    "runs/prior_mimic/seed_42/checkpoints/last.ckpt", map_location=device
+).eval()
+vqvae = prior.vqvae
 
 seq_length = 5000
 factor = 2 ** (len(vqvae.config.channel_multipliers) - 1)    # 8 for (1, 2, 4, 4)

@@ -15,8 +15,8 @@ generating samples from a trained checkpoint.
 
 ## Requirement: the legacy `ecgen` package
 
-!!! warning "This path imports the legacy `ecgen` package from `src/ecgen/`"
-    `train_pulse2pulse.py` and `generate_pulse2pulse.py` import from the **legacy** layout:
+!!! warning "Training imports the legacy `ecgen` package from `src/ecgen/`"
+    `train_pulse2pulse.py` imports from the **legacy** layout:
 
     ```python
     from ecgen.models.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
@@ -30,18 +30,18 @@ generating samples from a trained checkpoint.
     `["models", "data", "training", "evaluation", "utils", "visualization"]`, so `src/ecgen/`
     is not installed.
 
-    Both scripts try to fix this themselves:
+    The script tries to fix this itself:
 
     ```python
     _REPO_ROOT = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     ```
 
-    However, the scripts live two levels deep (`scripts/train/`, `scripts/generate/`), so
+    However, the script lives two levels deep (`scripts/train/`), so
     `_REPO_ROOT` resolves to `scripts/` and the inserted path is `scripts/src`, which does not
     exist. **The `sys.path` hack has no effect.**
 
-    The scripts work in an environment only if `src/` is already on `sys.path`. This can happen
+    The script works in an environment only if `src/` is already on `sys.path`. This can happen
     through a stale `.pth` file left by an older editable install that used a `src/` layout,
     which is how the maintainers' `pytorch2` conda env works. In a clean environment, you get
     `ModuleNotFoundError: No module named 'ecgen'`.
@@ -59,6 +59,11 @@ generating samples from a trained checkpoint.
     `data/datasets/mimic/pulse2pulse_datamodule.py`, the new-layout copy of the data module,
     has the same dependency. Inside `setup()` it does
     `from ecgen.data.mimic_dataset import MIMICIVECGDataset`, so it also needs `src/` on the path.
+
+    `generate_pulse2pulse.py` is **not** affected: it puts the repo root on `sys.path` and
+    imports `Pulse2PulseGAN` from `models.gan.pulse2pulse`, so it runs after `pip install -e .`
+    without `PYTHONPATH=src`. Checkpoints written by the legacy training script load into the
+    new-layout class (same config fields and module names).
 
 ## Training
 
@@ -248,7 +253,6 @@ For the meaning of the logged `train/*` and `val/*` metrics, see
 ## Generating samples
 
 ```bash
-export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 python scripts/generate/generate_pulse2pulse.py \
     --checkpoint runs/pulse2pulse_mimic/seed_42/checkpoints/last.ckpt \
     --output-dir generated_samples \
@@ -272,14 +276,9 @@ The script writes:
 - `generated_sample_{0..3}.png`: per-lead plots for the first `min(n_samples, 4)` samples
 - `generated_samples.pt`: a `(n_samples, C, L)` CPU tensor, only with `--save-tensors`
 
-!!! bug "Checkpoint loading fails as written"
-    The script calls `Pulse2PulseGAN.load_from_checkpoint(args.checkpoint, map_location=device)`.
-    That call raises `TypeError: __init__() missing 1 required positional argument: 'config'`,
-    because the module saves its config fields, not a `config` argument, as hyperparameters.
-    Until that is fixed, load the model as shown in
-    [Pulse2Pulse GAN → Loading a checkpoint](../models/gan.md#loading-a-checkpoint), by passing
-    `config=Pulse2PulseConfig(**hparams)` and `strict=False`, and then call
-    `model.generate_samples(n)`.
+The script loads the model with
+`Pulse2PulseGAN.load_from_checkpoint(args.checkpoint, map_location=device)` and needs no extra
+arguments; see [Pulse2Pulse GAN → Loading a checkpoint](../models/gan.md#loading-a-checkpoint).
 
 ## Setup check
 

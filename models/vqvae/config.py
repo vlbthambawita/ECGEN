@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, Optional
 
 
 @dataclass
@@ -40,3 +41,6 @@ class PriorConfig:
     
     # VQ-VAE checkpoint
     vqvae_checkpoint: str = ""
+    # VQ-VAE architecture, filled in when vqvae_checkpoint is loaded so that
+    # prior checkpoints can be restored without the stage-1 file
+    vqvae_config: Optional[dict[str, Any]] = None

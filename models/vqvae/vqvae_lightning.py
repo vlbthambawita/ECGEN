@@ -9,6 +9,7 @@ from torch import Tensor
 from models.vqvae.vqvae_1d import VQVAE1D
 from models.vqvae.config import VQVAEConfig
 from training.losses.vqvae_losses import vqvae_loss
+from utils.config import resolve_config
 
 
 class VQVAELightning(pl.LightningModule):
@@ -18,10 +19,9 @@ class VQVAELightning(pl.LightningModule):
     Handles training, validation, and sampling for Stage 1 (VQ-VAE training).
     """
 
-    def __init__(self, config: VQVAEConfig | dict[str, Any]) -> None:
+    def __init__(self, config: VQVAEConfig | dict[str, Any] | None = None, **kwargs: Any) -> None:
         super().__init__()
-        if isinstance(config, dict):
-            config = VQVAEConfig(**config)
+        config = resolve_config(VQVAEConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 

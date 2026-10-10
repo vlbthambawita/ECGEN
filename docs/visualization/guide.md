@@ -144,13 +144,11 @@ can be `torch.Tensor` or `numpy.ndarray`; time axes are in seconds using `sampli
 
 ```python
 import torch
-from models.vae import VAELightning, VAEConfig
+from models.vae import VAELightning
 from data.datasets.mimic.dataset import MIMICIVECGDataset
 from visualization import plot_ecg_leads, plot_ecg_comparison, plot_latent_space_2d
 
-ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
-model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
-model.load_state_dict(ckpt["state_dict"])
+model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()
 
 ds = MIMICIVECGDataset(mimic_path="/path/to/mimic-iv-ecg", split="test", max_samples=64)

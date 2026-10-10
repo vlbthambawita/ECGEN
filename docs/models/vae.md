@@ -122,21 +122,18 @@ stopping). The optimiser is a single Adam with no LR scheduler.
 
 Checkpoints from both `VAELightning` and the script's `VAEDataWrapper` store the flattened
 `VAEConfig` fields as hyper-parameters and the weights under `vae.*`, so they can be loaded into
-`VAELightning`:
+`VAELightning`. The constructor accepts either `config=` or the flat config fields as keyword
+arguments, so a plain `load_from_checkpoint` works:
 
 ```python
-import torch
-from models.vae import VAELightning, VAEConfig
+from models.vae import VAELightning
 
-ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
-model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
-model.load_state_dict(ckpt["state_dict"])
+model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()
 ```
 
-`VAELightning.load_from_checkpoint(path)` on its own raises
-`TypeError: missing ... 'config'`; pass the config explicitly
-(`load_from_checkpoint(path, config=VAEConfig(...))`) or use the snippet above.
+Passing `config=VAEConfig(...)` explicitly still works and takes precedence over the stored
+hyper-parameters. Unknown keyword arguments raise `TypeError: Unexpected VAEConfig fields: [...]`.
 
 ### Latent interpolation
 

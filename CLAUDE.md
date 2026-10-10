@@ -30,7 +30,7 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.pa
 
 **Two code layouts coexist — be careful which one you touch.**
 - **New layout (current):** top-level packages `models/`, `data/`, `training/`, `evaluation/`, `visualization/`, `utils/`. Imports look like `from models.vqvae import VQVAELightning`, `from data.datasets.mimic.dataset import MIMICIVECGDataset`. See `MIGRATION_GUIDE.md` for the old→new import mapping.
-- **Legacy layout:** `src/ecgen/` (imported as `ecgen.*`). It is *not* in `pyproject.toml`'s package list, yet some code still imports it: `tests/test_models/test_vae.py`, `scripts/train/train_pulse2pulse.py`, `scripts/generate/generate_pulse2pulse.py`, `scripts/utils/test_models_only.py`, `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`), `training/trainers/gan_trainer.py`, and `data/datasets/mimic/pulse2pulse_datamodule.py`. Those paths only work with `PYTHONPATH=src` (the scripts' own `sys.path` hack resolves to the nonexistent `scripts/src`).
+- **Legacy layout:** `src/ecgen/` (imported as `ecgen.*`). It is *not* in `pyproject.toml`'s package list, yet some code still imports it: `tests/test_models/test_vae.py`, `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_models_only.py`, `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`), `training/trainers/gan_trainer.py`, and `data/datasets/mimic/pulse2pulse_datamodule.py`. Those paths only work with `PYTHONPATH=src` (the scripts' own `sys.path` hack resolves to the nonexistent `scripts/src`).
 - **`single_file/`:** a self-contained VQ-VAE (both stages) in `train_vqvae_standalone.py` with its own model/data/training code and `run_train_vqvae.sh`. Independent of the packages above; changes to `models/vqvae/` are not reflected there and vice versa.
 
 **Model package pattern** (`models/vae/`, `models/vqvae/`): a dataclass config (`config.py`), a plain `nn.Module` (`*_1d.py`), and a `LightningModule` wrapper (`*_lightning.py`) that owns loss, optimizers, and `sample()`. Shared conv blocks live in `models/components/`; losses in `training/losses/` (`vae_losses.py`, `vqvae_losses.py`, `gan_losses.py`).
@@ -43,7 +43,9 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.pa
 
 **Outputs:** runs go to `runs/<exp_name>/seed_<seed>/` (checkpoints named `epoch###-step######.ckpt` plus `last.ckpt` — there is no `best.ckpt`; TensorBoard logs under `tb/`). W&B logging is optional and enabled via the `wandb` config section. `training/callbacks/visualization.py` plots reconstructions/samples during training.
 
-**Known pitfalls:** Lightning wrappers call `save_hyperparameters(config.__dict__)`, so plain `X.load_from_checkpoint(path)` fails with a missing-`config` TypeError — pass `config=<Config>(**ckpt["hyper_parameters"])`. The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default), not 16×. In the train scripts, YAML values override CLI flags, and the YAML `callbacks:` section is ignored.
+**Checkpoint loading:** wrappers save the config as flat hyperparameters (`save_hyperparameters(config.__dict__)`) and accept `config=None, **kwargs` via `utils.config.resolve_config`, so plain `X.load_from_checkpoint(path)` works; keep that signature on new wrappers. `PriorLightning` records the stage-1 config in `vqvae_config`, so prior checkpoints restore the frozen VQ-VAE from their own weights. `tests/test_models/test_checkpoint_loading.py` covers this.
+
+**Known pitfalls:** The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default), but `PriorLightning.sample` still assumes 16×. In the train scripts, YAML values override CLI flags (except the prior's `--vqvae-checkpoint`), and the YAML `callbacks:` section is ignored.
 
 ## Documentation
 

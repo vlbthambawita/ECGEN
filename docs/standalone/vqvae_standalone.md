@@ -39,15 +39,6 @@ WANDB_ENABLED=false \
 tensorboard --logdir runs
 ```
 
-!!! danger "Stage 2 currently fails to start"
-    Stage 2 loads the stage-1 model with `VQVAELightning.load_from_checkpoint(path)`. Stage-1 checkpoints store the config fields as flat hyperparameters (`in_channels=…, base_channels=…`), but `VQVAELightning.__init__` takes a single `config` argument. Lightning filters the flat keys out and the call fails with
-
-    ```text
-    TypeError: VQVAELightning.__init__() missing 1 required positional argument: 'config'
-    ```
-
-    (Reproduced with pytorch-lightning 2.0.2.) Until `PriorLightning._load_vqvae` is fixed to pass the config explicitly, `./run_train_vqvae.sh both` completes stage 1 and then stops in stage 2. See [Loading checkpoints and sampling](#loading-checkpoints-and-sampling) for a workaround when you call the classes from Python.
-
 ## Validating the data
 
 ```bash
@@ -329,26 +320,24 @@ When `--wandb` is set, the script creates a `WandbLogger` with `save_dir=<run_di
 
 ## Loading checkpoints and sampling
 
-Because of the `load_from_checkpoint` problem described above, pass the stored hyperparameters back in as `config`. `PriorLightning.sample()` also computes the latent length as `seq_length // 16`, which gives 312 codes and a **2496-sample** output for `seq_length=5000`. The encoder downsamples by 8, so call the prior's sampler with `latent_length = seq_length // 8`:
+`VQVAELightning` and `PriorLightning` rebuild their config from the flat hyperparameters stored in the checkpoint, so a plain `load_from_checkpoint(path)` works (passing `config=` explicitly is still accepted). When stage 2 loads the stage-1 checkpoint, it records the VQ-VAE's config as `vqvae_config` in the prior's hyperparameters; together with the `vqvae.*` weights already stored in the prior checkpoint, this makes the prior checkpoint self-contained, so loading it does not read the stage-1 file. (Prior checkpoints saved before `vqvae_config` was added still load the VQ-VAE from the stored `vqvae_checkpoint` path.)
+
+`PriorLightning.sample()` still computes the latent length as `seq_length // 16`, which gives 312 codes and a **2496-sample** output for `seq_length=5000`. The encoder downsamples by 8, so call the prior's sampler with `latent_length = seq_length // 8`:
 
 ```python
 # run from inside single_file/
 import torch
-from train_vqvae_standalone import VQVAELightning, PriorLightning, PriorConfig
+from train_vqvae_standalone import VQVAELightning, PriorLightning
 
-def hparams(path):
-    return torch.load(path, map_location="cpu", weights_only=False)["hyper_parameters"]
+# Stage 1 on its own (reconstruction, encode_to_indices, decode_from_indices)
+vqvae = VQVAELightning.load_from_checkpoint(
+    "runs/vqvae_mimic_standalone/seed_42/checkpoints/last.ckpt", map_location="cpu"
+).eval()
 
-vq_path = "runs/vqvae_mimic_standalone/seed_42/checkpoints/last.ckpt"
-vqvae = VQVAELightning.load_from_checkpoint(vq_path, config=hparams(vq_path)).eval()
-
-# Prior: build without a checkpoint path (avoids the broken loader), attach the VQ-VAE, then load weights
-prior_path = "runs/prior_mimic_standalone/seed_42/checkpoints/last.ckpt"
-hp = dict(hparams(prior_path), vqvae_checkpoint="")
-prior = PriorLightning(PriorConfig(**hp))
-prior.vqvae = vqvae
-prior.load_state_dict(torch.load(prior_path, map_location="cpu", weights_only=False)["state_dict"])
-prior.eval().to("cuda")
+# Prior: also restores its frozen VQ-VAE from the prior checkpoint
+prior = PriorLightning.load_from_checkpoint(
+    "runs/prior_mimic_standalone/seed_42/checkpoints/last.ckpt", map_location="cuda"
+).eval()
 
 seq_length = 5000
 codes = prior.prior.sample(batch_size=16, latent_length=seq_length // 8,
@@ -356,8 +345,6 @@ codes = prior.prior.sample(batch_size=16, latent_length=seq_length // 8,
 samples = prior.vqvae.decode_from_indices(codes)   # [16, 12, 5000], per-sample normalized units
 torch.save(samples.cpu(), "generated_ecgs.pt")
 ```
-
-The prior part requires a stage-2 checkpoint, which you can only get once the stage-2 loader is fixed. The VQ-VAE part (reconstruction, `encode_to_indices`, `decode_from_indices`) works on existing stage-1 checkpoints as shown.
 
 ## Differences from the packaged implementation
 
@@ -373,7 +360,7 @@ The prior part requires a stage-2 checkpoint, which you can only get once the st
 | Resume | not supported | `--resume <ckpt>` |
 | W&B | stage 1 logger not attached (bug) | attached via `logger=loggers_list` |
 | Default run names | `vqvae_mimic_standalone`, `prior_mimic_standalone` (wrapper) | `vqvae_mimic`, `prior_mimic` |
-| Shared behaviour | same architecture, defaults, metric names, checkpoint naming and the `load_from_checkpoint` / `seq_length // 16` issues | |
+| Shared behaviour | same architecture, defaults, metric names, checkpoint naming, config-from-hyperparameters checkpoint loading (self-contained prior checkpoints), and the `seq_length // 16` sampling issue | |
 
 The `nn.Module` attribute names match (`vqvae.encoder`, `vqvae.vq`, `vqvae.decoder`, `prior.*`), so state-dict weights can in principle be moved between the two by loading the `state_dict` into the other class. `load_from_checkpoint` across implementations is not supported. For the packaged workflow, see [VQ-VAE](../models/vqvae.md) and [VQ-VAE training](../training/vqvae_training.md).
 
@@ -383,7 +370,7 @@ The `nn.Module` attribute names match (`vqvae.encoder`, `vqvae.vq`, `vqvae.decod
 |---------|-----|
 | `Data directory not found` (wrapper) / `ERROR: Data directory does not exist` | Set `DATA_DIR` / `--data-dir` to the folder containing `machine_measurements.csv`. |
 | `Dataset is empty after filtering!` | Run `test_data_loading.py`. Check that `files/p*/p*/s*/*.hea` and `.dat` exist. Try `--skip-missing-check` (Python script only). |
-| `VQVAELightning.__init__() missing 1 required positional argument: 'config'` | Known stage-2 loader bug. See [above](#loading-checkpoints-and-sampling). |
+| `TypeError: Unexpected VQVAEConfig fields: [...]` (or `PriorConfig`) | A keyword argument passed to the constructor or `load_from_checkpoint` is not a config field. Check its spelling. |
 | `devices selected with CPUAccelerator should be an int > 0` | CPU runs are not supported by the current `--devices` parsing. |
 | CUDA out of memory | Lower `BATCH_SIZE`, or `BASE_CHANNELS`/`LATENT_CHANNELS`. |
 | Low `codebook_usage` | Try a smaller `NUM_EMBEDDINGS`. Note the [β convention](#stage-1-vq-vae) before tuning `COMMITMENT_COST`. |
@@ -398,7 +385,7 @@ The Markdown files in `single_file/` predate several changes. Compared with the 
 - **`WANDB_ENABLED`**: `WANDB_GUIDE.md` lists the default as `false`. The wrapper default is `true`.
 - **W&B support**: `FIXES.md` says W&B "was never included". It is included, but stage 1 does not attach the logger.
 - **`--resume`**: shown in `README.md`, but the flag does not exist.
-- **Sampling snippet**: `PriorLightning.load_from_checkpoint(...)` + `model.sample(...)` fails to load, and if loaded would return `[16, 12, 2496]`, not `[16, 12, 5000]`.
+- **Sampling snippet**: `PriorLightning.load_from_checkpoint(...)` now loads, but `model.sample(...)` returns `[16, 12, 2496]`, not `[16, 12, 5000]`. Use the snippet [above](#loading-checkpoints-and-sampling).
 - **Low codebook usage → "increase commitment cost"**: with the β placement in this code, β scales the codebook update, not encoder commitment.
 - The README omits `LOG_EVERY_N_STEPS` and `CHECK_VAL_EVERY_N_EPOCH`, which the wrapper does support.
 

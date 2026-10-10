@@ -28,7 +28,7 @@ model:
       lr: 0.001
       b1: 0.9
       b2: 0.999
-      vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/best.ckpt"  # Update this path
+      vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"  # --vqvae-checkpoint overrides this
 
 data:
   target: data.datasets.mimic.MIMICIVECGDataset

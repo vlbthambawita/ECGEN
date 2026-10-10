@@ -74,18 +74,15 @@ pip install -e .
 ```
 
 ```python
-import torch
-from models.vae import VAEConfig, VAELightning
+from models.vae import VAELightning
 
-ckpt_path = "runs/vae_mimic/seed_42/checkpoints/last.ckpt"
-hparams = torch.load(ckpt_path, map_location="cpu", weights_only=False)["hyper_parameters"]
-model = VAELightning.load_from_checkpoint(ckpt_path, config=VAEConfig(**hparams))
+model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt")
 samples = model.sample(n_samples=16, seq_length=5000)
 ```
 
 !!! note
     See the [training guide](training/guide.md) for every model's entry point and its known caveats.
-    Checkpoints store the config as flat hyperparameters, so the config must be passed back in when loading. See [VAE](models/vae.md) for details.
+    The Lightning wrappers rebuild their config from the flat hyperparameters stored in the checkpoint, so `load_from_checkpoint(path)` needs no extra arguments. See [VAE](models/vae.md) for details.
 
 ## Repository layout
 

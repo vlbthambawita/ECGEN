@@ -9,6 +9,7 @@ from torch import Tensor
 from models.vae.vae_1d import VAE1D
 from models.vae.config import VAEConfig
 from training.losses.vae_losses import vae_loss
+from utils.config import resolve_config
 
 
 class VAELightning(pl.LightningModule):
@@ -16,10 +17,9 @@ class VAELightning(pl.LightningModule):
     PyTorch Lightning wrapper for VAE1D model.
     """
 
-    def __init__(self, config: VAEConfig | dict[str, Any]) -> None:
+    def __init__(self, config: VAEConfig | dict[str, Any] | None = None, **kwargs: Any) -> None:
         super().__init__()
-        if isinstance(config, dict):
-            config = VAEConfig(**config)
+        config = resolve_config(VAEConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 

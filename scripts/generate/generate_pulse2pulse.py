@@ -12,11 +12,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import torch
 
-# Add src to path for imports
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT / "src"))
+# Add project root to path for imports
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
 
-from ecgen.models.pulse2pulse import Pulse2PulseGAN
+from models.gan.pulse2pulse import Pulse2PulseGAN
 
 LEAD_NAMES_8 = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2"]
 

@@ -117,7 +117,7 @@ old → new mapping.
 it and need `PYTHONPATH=src`:
 
 - `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`)
-- `scripts/train/train_pulse2pulse.py`, `scripts/generate/generate_pulse2pulse.py`
+- `scripts/train/train_pulse2pulse.py`
 - `scripts/utils/test_models_only.py`
 - `training/trainers/gan_trainer.py`
 - `data/datasets/mimic/pulse2pulse_datamodule.py`

@@ -24,7 +24,7 @@ import argparse
 import os
 import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
@@ -596,14 +596,26 @@ class VQVAEConfig:
     b2: float = 0.999
 
 
+def _resolve_config(config_cls, config, flat_kwargs: dict):
+    """Accept a config instance, a dict, or flat fields (as passed by load_from_checkpoint)."""
+    valid = {f.name for f in fields(config_cls)}
+    unknown = set(flat_kwargs) - valid
+    if unknown:
+        raise TypeError(f"Unexpected {config_cls.__name__} fields: {sorted(unknown)}")
+    if config is None:
+        return config_cls(**flat_kwargs)
+    if isinstance(config, dict):
+        return config_cls(**config)
+    return config
+
+
 class VQVAELightning(pl.LightningModule):
     """PyTorch Lightning wrapper for VQ-VAE model."""
 
-    def __init__(self, config: VQVAEConfig | dict) -> None:
+    def __init__(self, config: VQVAEConfig | dict | None = None, **kwargs) -> None:
         super().__init__()
-        # Handle both VQVAEConfig object and dict (for checkpoint loading)
-        if isinstance(config, dict):
-            config = VQVAEConfig(**config)
+        # load_from_checkpoint passes the saved hyperparameters as flat kwargs
+        config = _resolve_config(VQVAEConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 
@@ -688,16 +700,18 @@ class PriorConfig:
     b1: float = 0.9
     b2: float = 0.999
     vqvae_checkpoint: str = ""
+    # Filled in when vqvae_checkpoint is loaded, so prior checkpoints can be
+    # restored without the stage-1 file
+    vqvae_config: Optional[dict] = None
 
 
 class PriorLightning(pl.LightningModule):
     """PyTorch Lightning wrapper for PixelCNN prior model."""
 
-    def __init__(self, config: PriorConfig | dict) -> None:
+    def __init__(self, config: PriorConfig | dict | None = None, **kwargs) -> None:
         super().__init__()
-        # Handle both PriorConfig object and dict (for checkpoint loading)
-        if isinstance(config, dict):
-            config = PriorConfig(**config)
+        # load_from_checkpoint passes the saved hyperparameters as flat kwargs
+        config = _resolve_config(PriorConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 
@@ -708,16 +722,24 @@ class PriorLightning(pl.LightningModule):
         )
 
         self.vqvae: VQVAELightning | None = None
-        if config.vqvae_checkpoint:
+        if config.vqvae_config is not None:
+            # Restoring a prior checkpoint: VQ-VAE weights come from its state_dict
+            self.vqvae = VQVAELightning(config.vqvae_config)
+            self.vqvae.eval()
+            self.vqvae.freeze()
+        elif config.vqvae_checkpoint:
             self._load_vqvae(config.vqvae_checkpoint)
 
     def _load_vqvae(self, checkpoint_path: str) -> None:
         if not Path(checkpoint_path).exists():
             raise FileNotFoundError(f"VQ-VAE checkpoint not found: {checkpoint_path}")
         print(f"Loading VQ-VAE from: {checkpoint_path}")
-        self.vqvae = VQVAELightning.load_from_checkpoint(checkpoint_path)
+        self.vqvae = VQVAELightning.load_from_checkpoint(checkpoint_path, map_location="cpu")
         self.vqvae.eval()
         self.vqvae.freeze()
+        vqvae_config = dict(self.vqvae.config.__dict__)
+        self.config.vqvae_config = vqvae_config
+        self.hparams["vqvae_config"] = vqvae_config
         print("VQ-VAE loaded and frozen")
 
     def forward(self, indices: Tensor) -> Tensor:

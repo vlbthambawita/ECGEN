@@ -66,22 +66,18 @@ runs/<experiment.name>/seed_<seed>/
 ## 5. Use the trained model
 
 ```python
-import torch
-from models.vae import VAELightning, VAEConfig
+from models.vae import VAELightning
 
-ckpt = torch.load("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
-model = VAELightning(VAEConfig(**ckpt["hyper_parameters"]))
-model.load_state_dict(ckpt["state_dict"])
+model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()
 
 samples = model.sample(n_samples=16, seq_length=5000)   # (16, 12, 5000)
 ```
 
-!!! warning
-    `VAELightning.load_from_checkpoint(path)` without arguments fails, because the module takes a
-    single `config` argument while the checkpoint stores the flattened config fields as
-    hyper-parameters. Either rebuild the config as above or pass it explicitly:
-    `VAELightning.load_from_checkpoint(path, config=VAEConfig())`.
+!!! note
+    The checkpoint stores the flattened `VAEConfig` fields as hyper-parameters, and `VAELightning`
+    rebuilds its config from them, so no `config=` argument is needed. Passing one explicitly
+    (`load_from_checkpoint(path, config=VAEConfig(...))`) still works and takes precedence.
 
 ## Next steps
 

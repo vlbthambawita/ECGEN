@@ -48,7 +48,7 @@ python -c "from models.vae import VAELightning; from models.vqvae import VQVAELi
 !!! warning "Legacy `ecgen` package"
     The old `src/ecgen/` package is **not** installed by `pip install -e .`, but some code still
     imports `ecgen.*`: `scripts/train/train_vae_mimic.py` (inside its `VAEDataWrapper`),
-    `scripts/train/train_pulse2pulse.py`, `scripts/generate/generate_pulse2pulse.py`,
+    `scripts/train/train_pulse2pulse.py`,
     `scripts/utils/test_models_only.py`, `training/trainers/gan_trainer.py`,
     `data/datasets/mimic/pulse2pulse_datamodule.py` and `tests/test_models/test_vae.py`.
     To run those, put `src/` on the path:

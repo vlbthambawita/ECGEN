@@ -143,12 +143,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--runs-root", type=str, default="runs", help="Root directory for runs")
     
-    # VQ-VAE checkpoint (required)
+    # VQ-VAE checkpoint (required, here or as model.params.config.vqvae_checkpoint in --config)
     parser.add_argument(
         "--vqvae-checkpoint",
         type=str,
-        required=True,
-        help="Path to trained VQ-VAE checkpoint from Stage 1",
+        default=None,
+        help="Path to trained VQ-VAE checkpoint from Stage 1 (overrides the config file)",
     )
     
     # Data
@@ -200,12 +200,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     
-    # Validate VQ-VAE checkpoint exists
-    if not Path(args.vqvae_checkpoint).exists():
-        print(f"Error: VQ-VAE checkpoint not found: {args.vqvae_checkpoint}")
-        print("Please train VQ-VAE first (Stage 1) using train_vqvae_mimic.py")
-        sys.exit(1)
-    
     # Validate that either config or data-dir is provided
     if not args.config and not args.data_dir:
         print("Error: Either --config or --data-dir must be provided")
@@ -234,8 +228,8 @@ def main() -> None:
             args.lr = model_cfg.get('lr', args.lr)
             args.b1 = model_cfg.get('b1', args.b1)
             args.b2 = model_cfg.get('b2', args.b2)
-            # VQ-VAE checkpoint can be overridden by config
-            if 'vqvae_checkpoint' in model_cfg:
+            # Config supplies the VQ-VAE checkpoint unless given on the command line
+            if args.vqvae_checkpoint is None and model_cfg.get('vqvae_checkpoint'):
                 args.vqvae_checkpoint = model_cfg['vqvae_checkpoint']
         
         if 'data' in yaml_config and 'params' in yaml_config['data']:
@@ -272,6 +266,16 @@ def main() -> None:
         print(f"Data directory: {args.data_dir}")
         print(f"VQ-VAE checkpoint: {args.vqvae_checkpoint}")
         print()
+    
+    # Validate VQ-VAE checkpoint (after config resolution)
+    if not args.vqvae_checkpoint:
+        print("Error: no VQ-VAE checkpoint given. Pass --vqvae-checkpoint or set")
+        print("model.params.config.vqvae_checkpoint in the config file.")
+        sys.exit(1)
+    if not Path(args.vqvae_checkpoint).exists():
+        print(f"Error: VQ-VAE checkpoint not found: {args.vqvae_checkpoint}")
+        print("Please train VQ-VAE first (Stage 1) using train_vqvae_mimic.py")
+        sys.exit(1)
     
     set_global_seed(args.seed)
     

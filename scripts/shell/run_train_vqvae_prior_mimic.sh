@@ -12,8 +12,8 @@ if [ $# -lt 1 ]; then
     echo "Usage: $0 <vqvae_checkpoint> [config_path]"
     echo ""
     echo "Example:"
-    echo "  $0 runs/vqvae_mimic/seed_42/checkpoints/best.ckpt"
-    echo "  $0 runs/vqvae_mimic/seed_42/checkpoints/best.ckpt configs/experiments/prior_mimic.yaml"
+    echo "  $0 runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"
+    echo "  $0 runs/vqvae_mimic/seed_42/checkpoints/last.ckpt configs/experiments/prior_mimic.yaml"
     exit 1
 fi
 

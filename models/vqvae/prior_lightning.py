@@ -11,6 +11,7 @@ from models.vqvae.pixelcnn_prior import PixelCNNPrior
 from models.vqvae.vqvae_lightning import VQVAELightning
 from models.vqvae.config import PriorConfig
 from training.losses.vqvae_losses import prior_loss
+from utils.config import resolve_config
 
 
 class PriorLightning(pl.LightningModule):
@@ -21,10 +22,9 @@ class PriorLightning(pl.LightningModule):
     Requires a trained VQ-VAE checkpoint to extract discrete codes.
     """
 
-    def __init__(self, config: PriorConfig | dict[str, Any]) -> None:
+    def __init__(self, config: PriorConfig | dict[str, Any] | None = None, **kwargs: Any) -> None:
         super().__init__()
-        if isinstance(config, dict):
-            config = PriorConfig(**config)
+        config = resolve_config(PriorConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 
@@ -34,9 +34,15 @@ class PriorLightning(pl.LightningModule):
             num_layers=config.num_layers,
         )
 
-        # Load frozen VQ-VAE for encoding
+        # Frozen VQ-VAE for encoding/decoding. When restoring a prior checkpoint,
+        # vqvae_config is set and the VQ-VAE weights come from this checkpoint's
+        # state_dict, so the original stage-1 file is not needed.
         self.vqvae: VQVAELightning | None = None
-        if config.vqvae_checkpoint:
+        if config.vqvae_config is not None:
+            self.vqvae = VQVAELightning(config.vqvae_config)
+            self.vqvae.eval()
+            self.vqvae.freeze()
+        elif config.vqvae_checkpoint:
             self._load_vqvae(config.vqvae_checkpoint)
 
     def _load_vqvae(self, checkpoint_path: str) -> None:
@@ -45,9 +51,13 @@ class PriorLightning(pl.LightningModule):
             raise FileNotFoundError(f"VQ-VAE checkpoint not found: {checkpoint_path}")
         
         print(f"Loading VQ-VAE from: {checkpoint_path}")
-        self.vqvae = VQVAELightning.load_from_checkpoint(checkpoint_path)
+        self.vqvae = VQVAELightning.load_from_checkpoint(checkpoint_path, map_location="cpu")
         self.vqvae.eval()
         self.vqvae.freeze()
+        # Store the architecture so prior checkpoints are self-contained
+        vqvae_config = dict(self.vqvae.config.__dict__)
+        self.config.vqvae_config = vqvae_config
+        self.hparams["vqvae_config"] = vqvae_config
         print("VQ-VAE loaded and frozen")
 
     def forward(self, indices: Tensor) -> Tensor:

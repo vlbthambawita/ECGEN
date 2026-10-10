@@ -12,15 +12,19 @@ For training and sample generation, see [Pulse2Pulse Training](../training/pulse
 
 ## Where the code lives
 
-The implementation exists twice, as **byte-identical** copies:
+The implementation exists twice. The copies share the same architecture, config fields and
+parameter names, but only the new-layout copy has the checkpoint-loading fixes
+(`config=None, **kwargs` constructor and `on_load_checkpoint`, see
+[Loading a checkpoint](#loading-a-checkpoint)):
 
 | File | Import path | Used by |
 |------|-------------|---------|
-| `models/gan/pulse2pulse.py` | `models.gan.pulse2pulse` | Nothing in the scripts yet; installed by `pip install -e .` |
-| `src/ecgen/models/pulse2pulse.py` | `ecgen.models.pulse2pulse` (legacy) | `scripts/train/train_pulse2pulse.py`, `scripts/generate/generate_pulse2pulse.py`, `scripts/utils/test_pulse2pulse_setup.py` |
+| `models/gan/pulse2pulse.py` | `models.gan.pulse2pulse` | `scripts/generate/generate_pulse2pulse.py`; installed by `pip install -e .` |
+| `src/ecgen/models/pulse2pulse.py` | `ecgen.models.pulse2pulse` (legacy) | `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_pulse2pulse_setup.py` |
 
 !!! note "Which import should I use?"
-    The shipped train/generate scripts import the **legacy** `ecgen.models.pulse2pulse` module.
+    The shipped training script imports the **legacy** `ecgen.models.pulse2pulse` module
+    (the generate script uses the new layout).
     In your own code, prefer the new layout:
 
     ```python
@@ -245,33 +249,24 @@ and samples noise on the generator's device.
 
 ### Loading a checkpoint
 
-!!! bug "`load_from_checkpoint` without arguments fails"
-    The module calls `save_hyperparameters(config.__dict__)`, which stores the config *fields*
-    as hyperparameters, while `__init__` expects a single `config` argument. A plain
-    `Pulse2PulseGAN.load_from_checkpoint(path)` therefore raises
-    `TypeError: __init__() missing 1 required positional argument: 'config'`.
-    `scripts/generate/generate_pulse2pulse.py` makes this call and is affected.
-
-    The checkpoint also holds `netD.fc1.*` weights for the lazily created linear layer, which
-    a freshly built model does not have yet, so strict loading reports unexpected keys.
-
-This workaround was verified with PyTorch Lightning 2.0:
+A plain `load_from_checkpoint` restores the model:
 
 ```python
-import torch
-from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
-
-ckpt_path = "runs/pulse2pulse_mimic/seed_42/checkpoints/last.ckpt"
-hparams = torch.load(ckpt_path, map_location="cpu", weights_only=False)["hyper_parameters"]
+from models.gan.pulse2pulse import Pulse2PulseGAN
 
 model = Pulse2PulseGAN.load_from_checkpoint(
-    ckpt_path,
-    config=Pulse2PulseConfig(**hparams),
-    strict=False,          # ignore netD.fc1.* (not needed for generation)
+    "runs/pulse2pulse_mimic/seed_42/checkpoints/last.ckpt",
     map_location="cpu",
 )
 samples = model.generate_samples(16)
 ```
+
+The constructor accepts either `config=` or the flat `Pulse2PulseConfig` fields that
+`save_hyperparameters(config.__dict__)` stores in the checkpoint, so no config needs to be passed
+(an explicit `config=Pulse2PulseConfig(...)` still works). The checkpoint also holds
+`netD.fc1.*` weights for the lazily created linear layer; `on_load_checkpoint` creates `fc1` at
+the saved size before the state dict is loaded, so strict loading works and `strict=False` is
+not needed. `scripts/generate/generate_pulse2pulse.py` uses this call.
 
 ## Known issues
 

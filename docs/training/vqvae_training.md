@@ -10,12 +10,10 @@ The [VQ-VAE](../models/vqvae.md) is trained in two separate runs:
 Stage 2 needs a stage-1 checkpoint. Both stages train on MIMIC-IV-ECG. See
 [MIMIC-IV-ECG](../datasets/mimic.md) for the dataset.
 
-!!! warning "Stage 2 currently fails while loading the VQ-VAE checkpoint"
-    `PriorLightning` loads the stage-1 model with `VQVAELightning.load_from_checkpoint(path)`.
-    That call raises `TypeError: __init__() missing 1 required positional argument: 'config'`,
-    because the wrappers save their config as flat hyperparameters. Stage 2 will not start until
-    `PriorLightning._load_vqvae` passes `config=VQVAEConfig(**hparams)`. See
-    [Loading checkpoints](../models/vqvae.md#loading-checkpoints).
+`PriorLightning` loads the stage-1 model with a plain `VQVAELightning.load_from_checkpoint(path)`
+and records its config in the prior's hyperparameters, so a finished prior checkpoint can be
+restored on its own with `PriorLightning.load_from_checkpoint(path)`. See
+[Loading checkpoints](../models/vqvae.md#loading-checkpoints).
 
 ## Quick start
 
@@ -28,8 +26,8 @@ Stage 2 needs a stage-1 checkpoint. Both stages train on MIMIC-IV-ECG. See
 # Find a real checkpoint (there is no best.ckpt, see "Checkpoint names" below)
 ls runs/vqvae_mimic/seed_42/checkpoints/
 
-# Stage 2: PixelCNN prior. First set model.params.config.vqvae_checkpoint in
-# prior_mimic.yaml to the same file (see the gotcha below)
+# Stage 2: PixelCNN prior. The checkpoint argument overrides the
+# vqvae_checkpoint path in prior_mimic.yaml
 ./scripts/shell/run_train_vqvae_prior_mimic.sh \
     runs/vqvae_mimic/seed_42/checkpoints/last.ckpt
 ```
@@ -59,8 +57,8 @@ and arguments resolve against the repo root. They use whichever `python` is on y
     - `config_path` defaults to `configs/experiments/prior_mimic.yaml`.
     - It runs `python scripts/train/train_prior_mimic.py --config "<config_path>" --vqvae-checkpoint "<vqvae_checkpoint>"`.
 
-    The wrapper's usage message suggests `runs/vqvae_mimic/seed_42/checkpoints/best.ckpt`.
-    That file is never created. Use one of the real checkpoint files instead.
+    The wrapper's usage examples use `runs/vqvae_mimic/seed_42/checkpoints/last.ckpt`. The
+    checkpoint you pass overrides the path in the YAML.
 
 The stage-2 wrapper is `run_train_vqvae_prior_mimic.sh`. `models/vqvae/README.md` and
 `VQVAE_IMPLEMENTATION.md` refer to it as `run_train_prior_mimic.sh`, which does not exist.
@@ -75,7 +73,8 @@ You can run both scripts directly from the repo root. You must pass either `--co
     arguments with any matching keys from the YAML. For example,
     `--config configs/experiments/vqvae_mimic.yaml --max-epochs 5` still trains for the YAML's
     `max_epochs: 100`. To change a value that the YAML sets, edit the YAML or a copy of it.
-    CLI flags only take effect for settings the YAML does not contain. The table at the end
+    CLI flags only take effect for settings the YAML does not contain. The one exception is
+    stage 2's `--vqvae-checkpoint`, which overrides the YAML. The table at the end
     of this section lists which settings each script reads from the YAML.
 
 ### Shared flags (both scripts)
@@ -132,7 +131,7 @@ There is no flag for `channel_multipliers`. The script hard-codes `(1, 2, 4, 4)`
 
 | Flag | Default |
 |---|---|
-| `--vqvae-checkpoint` | **required** (argparse `required=True`, even when the YAML sets a path) |
+| `--vqvae-checkpoint` | `None`. Overrides `model.params.config.vqvae_checkpoint` from the YAML. One of the two must be set, or the script exits with an error |
 | `--hidden-dim` | `128` |
 | `--num-layers` | `3` |
 
@@ -178,7 +177,7 @@ includes its `dirpath`, `patience` and `save_top_k` values.
 |---|---|
 | `experiment` | `name: prior_mimic`, `seed: 42` |
 | `wandb` | `enabled: false`, `project: ecg-vqvae-prior` |
-| `model.params.config` | `num_embeddings: 512`, `hidden_dim: 128`, `num_layers: 3`, `lr: 0.001`, **`vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/best.ckpt"`** |
+| `model.params.config` | `num_embeddings: 512`, `hidden_dim: 128`, `num_layers: 3`, `lr: 0.001`, `vqvae_checkpoint: "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"` (used only when `--vqvae-checkpoint` is not given) |
 | `data.params` | Same dataset path. `max_samples: 10000` |
 | `trainer` | Same as stage 1 |
 
@@ -193,28 +192,22 @@ not load them.** To change hyperparameters, edit the `model.params.config` block
 experiment YAML. See [Configuration](../getting_started/configuration.md) for the general
 config layout.
 
-## The `vqvae_checkpoint` gotcha
+## Choosing the VQ-VAE checkpoint
 
-!!! danger "The path in `prior_mimic.yaml` overrides `--vqvae-checkpoint`, and the default path does not exist"
-    `train_prior_mimic.py` handles the checkpoint path in this order:
+`train_prior_mimic.py` resolves the stage-1 checkpoint path in this order:
 
-    1. It checks that the **CLI** `--vqvae-checkpoint` path exists. The shell wrapper checks this too.
-    2. It loads the YAML. If `model.params.config` contains a `vqvae_checkpoint` key, that value
-       **replaces** the CLI path. Nothing checks the new path at this point.
-    3. `PriorLightning.__init__` tries to load the replaced path and raises
-       `FileNotFoundError: VQ-VAE checkpoint not found: runs/vqvae_mimic/seed_42/checkpoints/best.ckpt`.
+1. `--vqvae-checkpoint`, if given (the shell wrapper always passes it).
+2. Otherwise `model.params.config.vqvae_checkpoint` from the YAML. `prior_mimic.yaml` defaults
+   to `runs/vqvae_mimic/seed_42/checkpoints/last.ckpt`.
 
-    `ModelCheckpoint` in stage 1 never writes `best.ckpt`. It writes
-    `epoch{epoch:03d}-step{step:06d}.ckpt` for the top-k checkpoints by `val_loss`, plus `last.ckpt`.
+The path is validated after the config is resolved. If neither source sets a path, the script
+exits with `Error: no VQ-VAE checkpoint given`; if the file does not exist, it exits with
+`Error: VQ-VAE checkpoint not found: <path>`. So with the default YAML you can run
+`python scripts/train/train_prior_mimic.py --config configs/experiments/prior_mimic.yaml`
+without the flag once stage 1 has written `last.ckpt`.
 
-    Use one of these fixes:
-
-    - Set `vqvae_checkpoint` in the YAML to a file that exists, e.g.
-      `runs/vqvae_mimic/seed_42/checkpoints/epoch049-step001600.ckpt` or `.../last.ckpt`.
-      Keep `--vqvae-checkpoint` too, because it is still required.
-    - **Delete the `vqvae_checkpoint` line** from the YAML so the CLI path is used.
-      Setting it to `""` does not work. The key still overrides the CLI path, no VQ-VAE gets
-      loaded, and training fails with `RuntimeError: VQ-VAE not loaded`.
+Stage 1 never writes a `best.ckpt` (see below), so point at `last.ckpt` or one of the
+`epoch###-step######.ckpt` files.
 
 ### Checkpoint names
 

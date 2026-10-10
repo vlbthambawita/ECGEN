@@ -117,8 +117,9 @@ Settings that come only from CLI flags (defaults in parentheses): `--patience` (
 
 `train_prior_mimic.py` reads `experiment`, `wandb`, `data.params` and `trainer` (no
 `visualization` section), and from `model.params.config`: `num_embeddings`, `hidden_dim`,
-`num_layers`, `lr`, `b1`, `b2` and `vqvae_checkpoint`. A `vqvae_checkpoint` in the YAML
-**overrides** the required `--vqvae-checkpoint` flag.
+`num_layers`, `lr`, `b1`, `b2` and `vqvae_checkpoint`. Unlike the other keys, the YAML's
+`vqvae_checkpoint` is only a default: `--vqvae-checkpoint` overrides it when given, and the
+script exits with an error if neither is set.
 
 See [VQ-VAE training](../training/vqvae_training.md) for details.
 

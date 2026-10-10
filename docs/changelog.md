@@ -1,3 +1,32 @@
+# Changes Summary - Checkpoint Loading Fix
+
+## Overview
+
+Plain `load_from_checkpoint(path)` now works for `VAELightning`, `VQVAELightning`, `PriorLightning` and `Pulse2PulseGAN`, for new and existing checkpoints. Previously it raised `TypeError: __init__() missing 1 required positional argument: 'config'`, which also stopped VQ-VAE stage 2 from starting.
+
+---
+
+## Modified Files
+
+- **`utils/config.py`** (NEW)
+  - `resolve_config()` builds a config dataclass from `config=` or from the flat hyperparameters that `load_from_checkpoint` passes; unknown fields raise `TypeError("Unexpected <Config> fields: [...]")`
+- **`models/vae/vae_lightning.py`, `models/vqvae/vqvae_lightning.py`, `models/vqvae/prior_lightning.py`, `models/gan/pulse2pulse.py`** (MODIFIED)
+  - Constructors take `config=None, **kwargs`; passing `config=` explicitly still works
+- **`models/vqvae/config.py`, `models/vqvae/prior_lightning.py`** (MODIFIED)
+  - New `PriorConfig.vqvae_config`, recorded when the stage-1 checkpoint is loaded, so prior checkpoints restore without the stage-1 file
+- **`models/gan/pulse2pulse.py`** (MODIFIED)
+  - `on_load_checkpoint` creates the lazy `netD.fc1` at the saved size, so `strict=False` is no longer needed (`fc1` is still not trained)
+- **`scripts/generate/generate_pulse2pulse.py`** (MODIFIED)
+  - Imports `models.gan.pulse2pulse` instead of the legacy `ecgen` package; no `PYTHONPATH=src` needed
+- **`scripts/train/train_prior_mimic.py`, `configs/experiments/prior_mimic.yaml`, `scripts/shell/run_train_vqvae_prior_mimic.sh`** (MODIFIED)
+  - `--vqvae-checkpoint` is optional and overrides the YAML path; the YAML default and wrapper examples now point to `last.ckpt` instead of the never-written `best.ckpt`
+- **`single_file/train_vqvae_standalone.py`** (MODIFIED)
+  - Same loading fixes for the standalone `VQVAELightning` / `PriorLightning`
+- **`tests/test_models/test_checkpoint_loading.py`** (NEW)
+  - Reload tests for all wrappers
+
+---
+
 # Changes Summary - VAE Visualization Feature
 
 ## Overview

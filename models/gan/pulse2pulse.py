@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 import pytorch_lightning as pl
+from utils.config import resolve_config
 
 
 class Transpose1dLayer(nn.Module):
@@ -295,10 +296,9 @@ class Pulse2PulseGAN(pl.LightningModule):
     PyTorch Lightning wrapper around the Pulse2Pulse WaveGAN generator + discriminator.
     """
 
-    def __init__(self, config: Pulse2PulseConfig | dict[str, Any]) -> None:
+    def __init__(self, config: Pulse2PulseConfig | dict[str, Any] | None = None, **kwargs: Any) -> None:
         super().__init__()
-        if isinstance(config, dict):
-            config = Pulse2PulseConfig(**config)
+        config = resolve_config(Pulse2PulseConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
         self.config = config
 
@@ -318,6 +318,13 @@ class Pulse2PulseGAN(pl.LightningModule):
 
     def forward(self, noise: Tensor) -> Tensor:
         return self.netG(noise)
+
+    def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        # netD.fc1 is created lazily on the first forward pass; create it at the
+        # saved size so the checkpoint's weights can be loaded into it.
+        fc_weight = checkpoint.get("state_dict", {}).get("netD.fc1.weight")
+        if fc_weight is not None and self.netD.fc1 is None:
+            self.netD.fc1 = nn.Linear(fc_weight.shape[1], 1)
 
     def _sample_noise(self, batch_size: int, device: torch.device) -> Tensor:
         return torch.empty(
