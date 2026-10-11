@@ -3,6 +3,9 @@
 ECGEN models operate on multi-lead ECG tensors of shape `(batch, num_leads, seq_length)`; the
 MIMIC-IV-ECG pipeline produces `12 × 5000` by default (10 s at 500 Hz).
 
+!!! tip "Visual guide"
+    The [Visual Guide](../visual/index.md) shows every model as animated, interactive diagrams.
+
 | Family | Package | Status | Main classes | Details |
 |--------|---------|--------|--------------|---------|
 | VAE | [`models/vae/`](https://github.com/vlbthambawita/ECGEN/tree/main/models/vae) | Implemented | `VAE1D`, `VAELightning`, `VAEConfig` | [VAE](vae.md) |

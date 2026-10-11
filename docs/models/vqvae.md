@@ -2,6 +2,10 @@
 
 ECGEN's VQ-VAE is a two-stage generative model for 12-lead ECGs:
 
+!!! tip "Visual guide"
+    For animated diagrams of the input, architecture, output and loss, see the
+    [visual guide](../visual/vqvae.md).
+
 1. **Stage 1 – VQ-VAE** (`VQVAELightning`): a 1D convolutional autoencoder whose
    latent is snapped to the nearest entry of a learned codebook, so each ECG becomes a
    sequence of discrete code indices.

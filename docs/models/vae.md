@@ -3,6 +3,10 @@
 A 1-D convolutional variational autoencoder for multi-lead ECG, in
 [`models/vae/`](https://github.com/vlbthambawita/ECGEN/tree/main/models/vae).
 
+!!! tip "Visual guide"
+    For animated diagrams of the input, architecture, output and loss, see the
+    [visual guide](../visual/vae.md).
+
 | Class | File | Role |
 |-------|------|------|
 | `VAEConfig` | `models/vae/config.py` | Dataclass of architecture + optimiser settings |

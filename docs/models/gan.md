@@ -5,6 +5,10 @@ the **WGAN-GP** objective (Wasserstein loss with gradient penalty). The generato
 U-Net that turns a uniform-noise tensor *with the same shape as an ECG* into an ECG; the
 discriminator (critic) is a deep strided 1D CNN with WaveGAN phase shuffling.
 
+!!! tip "Visual guide"
+    For animated diagrams of the input, architecture, output and loss, see the
+    [visual guide](../visual/pulse2pulse.md).
+
 By default it models **8 leads × 5000 samples** (10 s at 500 Hz): leads I, II, III, aVR, aVL,
 aVF, V1, V2, the first 8 channels of the 12-lead MIMIC-IV-ECG records.
 

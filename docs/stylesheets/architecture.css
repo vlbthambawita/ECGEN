@@ -1,0 +1,180 @@
+/* Visual guide diagrams (docs/visual/). Colours follow the Material light/dark scheme. */
+
+:root,
+[data-md-color-scheme] {
+  --arch-fg: var(--md-default-fg-color);
+  --arch-muted: var(--md-default-fg-color--light);
+  --arch-faint: var(--md-default-fg-color--lightest);
+  --arch-bg: var(--md-default-bg-color);
+  --arch-panel: #f7f7f9;
+  --arch-data: #2563eb;
+  --arch-data-fill: #dbeafe;
+  --arch-module: #dc2626;
+  --arch-module-fill: #fee2e2;
+  --arch-frozen: #64748b;
+  --arch-frozen-fill: #e2e8f0;
+  --arch-loss: #d97706;
+  --arch-loss-fill: #fef3c7;
+  --arch-grad: #7c3aed;
+  --arch-ok: #059669;
+  --arch-ok-fill: #d1fae5;
+}
+
+.md-typeset figure.arch,
+.arch {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 1.2em 0 1.6em;
+  padding: 0.8em;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  background: var(--arch-panel);
+  overflow-x: auto;
+}
+
+[data-md-color-scheme="slate"] {
+  --arch-panel: #1c1e26;
+  --arch-data: #60a5fa;
+  --arch-data-fill: #1e3a5f;
+  --arch-module: #f87171;
+  --arch-module-fill: #4c1d1d;
+  --arch-frozen: #94a3b8;
+  --arch-frozen-fill: #334155;
+  --arch-loss: #fbbf24;
+  --arch-loss-fill: #4a3410;
+  --arch-grad: #a78bfa;
+  --arch-ok: #34d399;
+  --arch-ok-fill: #064e3b;
+}
+
+.arch svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 560px;
+  font-family: var(--md-text-font-family, sans-serif);
+}
+
+.arch figcaption,
+.arch .arch-caption {
+  margin-top: 0.5em;
+  font-size: 0.7rem;
+  color: var(--arch-muted);
+  text-align: center;
+}
+
+/* ---- SVG primitives ---- */
+
+.arch text { fill: var(--arch-fg); font-size: 13px; }
+.arch text.sm { font-size: 11px; }
+.arch text.xs { font-size: 9.5px; }
+.arch text.lg { font-size: 15px; font-weight: 600; }
+.arch text.muted { fill: var(--arch-muted); }
+.arch text.mono { font-family: var(--md-code-font-family, monospace); }
+.arch text.c { text-anchor: middle; }
+.arch text.r { text-anchor: end; }
+
+.arch .tensor { fill: var(--arch-data-fill); stroke: var(--arch-data); stroke-width: 1.5; }
+.arch .module { fill: var(--arch-module-fill); stroke: var(--arch-module); stroke-width: 1.5; }
+.arch .frozen { fill: var(--arch-frozen-fill); stroke: var(--arch-frozen); stroke-width: 1.5; stroke-dasharray: 5 3; }
+.arch .loss { fill: var(--arch-loss-fill); stroke: var(--arch-loss); stroke-width: 1.5; }
+.arch .ok { fill: var(--arch-ok-fill); stroke: var(--arch-ok); stroke-width: 1.5; }
+.arch .plain { fill: var(--arch-bg); stroke: var(--arch-faint); stroke-width: 1; }
+.arch .ghost { opacity: 0.35; }
+
+.arch .trace { fill: none; stroke: var(--arch-data); stroke-width: 1.4; stroke-linejoin: round; }
+.arch .trace.fake { stroke: var(--arch-module); }
+.arch .trace.mix { stroke: var(--arch-ok); }
+.arch .trace.noise { stroke: var(--arch-frozen); stroke-width: 1; }
+.arch .gridline { stroke: var(--arch-faint); stroke-width: 0.5; }
+
+.arch .edge { fill: none; stroke: var(--arch-muted); stroke-width: 1.6; marker-end: url(#arch-arrow); }
+.arch .edge.flow { stroke: var(--arch-data); stroke-dasharray: 6 5; animation: arch-flow 1.2s linear infinite; marker-end: url(#arch-arrow-data); }
+.arch .edge.grad { stroke: var(--arch-grad); stroke-dasharray: 3 4; animation: arch-flow-back 1.2s linear infinite; marker-end: url(#arch-arrow-grad); }
+.arch .edge.skip { stroke: var(--arch-ok); stroke-dasharray: 2 4; marker-end: url(#arch-arrow-ok); }
+.arch .edge.loss { stroke: var(--arch-loss); marker-end: url(#arch-arrow-loss); }
+.arch .edge.noarrow { marker-end: none; }
+
+.arch-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+#arch-arrow path { fill: var(--arch-muted); }
+#arch-arrow-data path { fill: var(--arch-data); }
+#arch-arrow-grad path { fill: var(--arch-grad); }
+#arch-arrow-ok path { fill: var(--arch-ok); }
+#arch-arrow-loss path { fill: var(--arch-loss); }
+
+@keyframes arch-flow { to { stroke-dashoffset: -22; } }
+@keyframes arch-flow-back { to { stroke-dashoffset: 14; } }
+
+/* Moving "packet" along a path is done with SMIL <animateMotion>; this styles it. */
+.arch .packet { fill: var(--arch-data); }
+.arch .packet.grad { fill: var(--arch-grad); }
+
+.arch .pulse { animation: arch-pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes arch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* Drawing animation for ECG traces (JS sets --len). */
+.arch .draw { stroke-dasharray: var(--len, 2000); stroke-dashoffset: var(--len, 2000); animation: arch-draw 4s linear infinite; }
+@keyframes arch-draw {
+  0% { stroke-dashoffset: var(--len, 2000); }
+  70%, 100% { stroke-dashoffset: 0; }
+}
+
+/* Interactive highlight states */
+.arch [data-hover] { cursor: pointer; transition: opacity 0.2s, stroke-width 0.2s; }
+.arch [data-hover]:hover > rect,
+.arch [data-hover].active > rect { stroke-width: 3; }
+.arch .dim { opacity: 0.2; transition: opacity 0.3s; }
+.arch .hl { fill: var(--arch-loss-fill) !important; stroke: var(--arch-loss) !important; }
+.arch .hl-node { fill: var(--arch-loss) !important; }
+.arch .rf-edge { stroke: var(--arch-faint); stroke-width: 1; fill: none; }
+.arch .rf-edge.on { stroke: var(--arch-loss); stroke-width: 2; }
+
+/* ---- HTML controls below a diagram ---- */
+
+.arch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1.2em;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.6em;
+  font-size: 0.72rem;
+}
+.arch-controls label { display: inline-flex; align-items: center; gap: 0.4em; }
+.arch-controls input[type="range"] { width: 9em; accent-color: var(--md-accent-fg-color); }
+.arch-controls output { font-family: var(--md-code-font-family, monospace); min-width: 4.5em; }
+.arch-controls button {
+  padding: 0.2em 0.8em;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font: inherit;
+  cursor: pointer;
+}
+.arch-controls button:hover { border-color: var(--md-accent-fg-color); color: var(--md-accent-fg-color); }
+.arch-controls button[aria-pressed="true"] { background: var(--md-accent-fg-color); color: var(--md-accent-bg-color); border-color: var(--md-accent-fg-color); }
+
+.arch-info {
+  min-height: 2.6em;
+  margin-top: 0.5em;
+  padding: 0.4em 0.7em;
+  border-left: 3px solid var(--md-accent-fg-color);
+  background: var(--md-default-bg-color);
+  font-size: 0.7rem;
+}
+
+/* ---- Legend ---- */
+
+.arch-legend { display: flex; flex-wrap: wrap; gap: 0.5em 1.4em; font-size: 0.72rem; justify-content: center; }
+.arch-legend span { display: inline-flex; align-items: center; gap: 0.4em; }
+.arch-legend svg { width: 34px; min-width: 0; height: 16px; display: inline-block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arch .edge.flow,
+  .arch .edge.grad,
+  .arch .pulse,
+  .arch .draw { animation: none; stroke-dashoffset: 0; }
+  .arch .packet { display: none; }
+}
