@@ -4,9 +4,7 @@ Executable scripts for training, generation, evaluation, and data processing.
 
 ## Structure
 
-- `train/` - Training scripts
-  - `train_vae_mimic.py` - Train VAE on MIMIC-IV-ECG
-  - `train_pulse2pulse.py` - Train Pulse2Pulse GAN
+- `train/` - `train_template.py` (notes on adding a model; training itself is `ecgen train <config>`)
 - `generate/` - Generation scripts
   - `generate_pulse2pulse.py` - Generate samples with Pulse2Pulse
 - `evaluate/` - Evaluation scripts (future)
@@ -14,10 +12,12 @@ Executable scripts for training, generation, evaluation, and data processing.
 - `utils/` - Utility scripts
   - `test_models_only.py` - Test model instantiation
   - `test_pulse2pulse_setup.py` - Test Pulse2Pulse setup
-- `shell/` - Shell wrapper scripts
+- `shell/` - Shell wrappers around `python -m ecgen train <config> [overrides]`
   - `run_train_vae_mimic_config.sh`
+  - `run_train_vqvae_mimic.sh`
+  - `run_train_vqvae_prior_mimic.sh <vqvae_ckpt>`
   - `run_train_pulse2pulse_mimic.sh`
-  - `run_train_pulse2pulse_standalone.sh`
+  - `run_train_pulse2pulse_standalone.sh` (settings from env vars)
   - `run_sweep.sh`
 
 ## Usage

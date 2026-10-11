@@ -1,3 +1,53 @@
+# Changes Summary - Training Moved Into the `ecgen` Package (Unreleased)
+
+## Overview
+
+Phase 0 of `PLAN_TRAINING_LIBRARY.md`. Training is now part of the published `ecgen` package, with **one YAML-driven runner for every model family**: `ecgen train <config.yaml> [dotted.key=value ...] [--resume ckpt] [--print-config]` (also `python -m ecgen train`), plus `ecgen list`. See [Training with `ecgen train`](training/runner.md).
+
+- **One runner, honoured config.** `model`/`data.dataset`/`callbacks` entries are built from a registry `name` or an import-path `target`, with `params` passed to the constructor. The `callbacks:` and `checkpoint:` sections now take effect; the old `visualization:` section is gone and unknown sections are rejected. Command-line overrides are applied after the YAML, so they always win (previously YAML values overrode CLI flags).
+- **Run directory.** Every run writes `checkpoints/`, `samples/`, `metrics/train_val_metrics.json`, `tb/`, `config_resolved.yaml` and `metadata.json` under `runs/<name>/seed_<seed>/`. Checkpoints also store the datamodule state (`lead_names`, `fs`, `seq_length`, `feature_normalizer`) under the `ECGDataModule` key.
+- **Compatibility check.** The run fails before training if the model's channel count or `seq_length` disagrees with the dataset.
+- **Data.** New dict-returning `MIMICIVECG` (`mimic_iv_ecg`) with lead selection (`leads: independent8`, `standard12` or a list), `scale`, `measurements` and `missing` options; a `SyntheticECG` (`synthetic`) dataset for smoke runs; a generic `ECGDataModule` with `split_params`; batches are `ecgen.types.ECGBatch`. With default parameters `MIMICIVECG` reproduces the legacy dataset's records, splits and signals exactly, and VAE, VQ-VAE and prior training through the runner reproduced the old scripts' logged metrics bit-for-bit on a 256-record subset.
+- **Fix: measurement normalization.** The measurement statistics are always fit on the train split (previously each split, after `max_samples` truncation, used its own statistics).
+- **Behaviour change: Pulse2Pulse leads.** `pulse2pulse_mimic.yaml` uses `leads: independent8` (I, II, V1–V6), matching the CSV columns written by `ecgen.generate`. The old script fed the first 8 file leads (I, II, III, aVR, aVF, aVL, V1, V2), and z-scored all 12 leads before dropping 4; the z-score is now computed over the selected leads. `run_train_pulse2pulse_mimic.sh` works again (it passed `--config` to a script that did not accept it).
+
+---
+
+## Removed Files
+
+- **`scripts/train/train_vae_mimic.py`, `train_vqvae_mimic.py`, `train_prior_mimic.py`, `train_pulse2pulse.py`** (DELETED) — and their inline DataModules and `VAEDataWrapper`; use `ecgen train configs/experiments/<name>.yaml`
+- **`data/datasets/mimic/datamodule.py`** (DELETED) — and the old dataclass placeholder in `src/ecgen/data/datamodule.py`; both replaced by the generic `ecgen.data.datamodule.ECGDataModule`
+
+## Moved Files (old paths are re-export shims for one release)
+
+- `models/vae/*` → `ecgen.families.vae`; `models/vqvae/*` → `ecgen.families.vqvae`; `models/gan/pulse2pulse.py` → `ecgen.families.gan.pulse2pulse`
+- `training/losses/{vae,vqvae,gan}_losses.py` → `ecgen.families.{vae,vqvae,gan}.losses`
+- `models/components/*` → `ecgen.nn.{blocks,encoders,decoders}`
+- `training/callbacks/*` → `ecgen.training.callbacks.*`
+- `utils/{config,io,logging,metadata,seed}.py` → `ecgen.utils.*`
+- `data/datasets/base.py` → `ecgen.data.datasets.base`
+- `ecgen.models.{vae,pulse2pulse}` → shims to `ecgen.families`
+
+## New Files
+
+- **`src/ecgen/cli.py`, `src/ecgen/__main__.py`** — the `ecgen` command (`[project.scripts]` in `pyproject.toml`)
+- **`src/ecgen/training/runner.py`** — the runner
+- **`src/ecgen/registry.py`** — `FAMILIES`, `DATASETS`, `CALLBACKS`
+- **`src/ecgen/types.py`** — `ECGBatch`, `ConditionOutput`, `get_signal`
+- **`src/ecgen/families/base.py`** — `GenerativeModule`, `Capabilities`
+- **`src/ecgen/data/{datasets/,datamodule.py,collate.py,leads.py,normalizers.py}`**
+- **`tests/test_core/`, `tests/test_data/test_ecgen_data.py`, `tests/test_training/test_runner.py`**
+
+## Modified Files
+
+- **`configs/experiments/{vae,vqvae,prior,pulse2pulse}_mimic.yaml`** — new schema
+- **`scripts/shell/*.sh`** — all call `python -m ecgen train <config> "$@"`
+- **`training/trainers/gan_trainer.py`, `ecgen.training.train`** — deprecated wrappers around the runner
+- **`scripts/train/train_template.py`** — now only points at the runner
+- **`pyproject.toml`** — `ecgen` console script; `matplotlib` and `tensorboard` added to the core dependencies
+
+---
+
 # Changes Summary - PixelCNN Prior Alignment and Receptive Field
 
 ## Overview

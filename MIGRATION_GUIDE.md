@@ -1,5 +1,35 @@
 # Migration Guide
 
+## 2026-10: training moved into the `ecgen` package (Phase 0)
+
+Training is now part of the published package and runs through one runner:
+`ecgen train configs/experiments/<x>.yaml [key=value ...]` (see `PLAN_TRAINING_LIBRARY.md`).
+The old import paths below still work for one release (they re-export the new modules).
+
+| Old | New |
+|---|---|
+| `models.vae.*` | `ecgen.families.vae` |
+| `models.vqvae.*` | `ecgen.families.vqvae` |
+| `models.gan.pulse2pulse` / `ecgen.models.pulse2pulse` | `ecgen.families.gan.pulse2pulse` |
+| `ecgen.models.vae` | `ecgen.families.vae` (+ `ecgen.nn` for the blocks) |
+| `models.components.{blocks,encoders,decoders}` | `ecgen.nn.{blocks,encoders,decoders}` |
+| `training.losses.{vae,vqvae,gan}_losses` | `ecgen.families.{vae,vqvae,gan}.losses` |
+| `training.callbacks.*` / `ecgen.training.callbacks` | `ecgen.training.callbacks.*` |
+| `utils.{config,io,logging,metadata,seed}` | `ecgen.utils.*` |
+| `data.datasets.base.BaseECGDataset` | `ecgen.data.datasets.BaseECGDataset` (samples use `"signal"`, not `"ecg_signals"`) |
+| `data.datasets.mimic.MIMICIVECGDataset` (tuples) | `ecgen.data.datasets.MIMICIVECG` (dicts) + `ecgen.data.datamodule.ECGDataModule` |
+| `scripts/train/train_{vae_mimic,vqvae_mimic,prior_mimic,pulse2pulse}.py` | `ecgen train <config>` (scripts removed) |
+| `training/trainers/gan_trainer.py`, `python -m ecgen.training.train` | `ecgen train <config>` (old entry points forward to it) |
+| `--vqvae-checkpoint <ckpt>` | `model.params.vqvae_checkpoint=<ckpt>` |
+
+Config files changed shape: `model: {name, params}` (flat), `data: {dataset: {name, params: {root, ...}}, batch_size, ...}`,
+`checkpoint:`, and a `callbacks:` list that is now honoured (the `visualization:` section became a
+`vae_visualization` callback). Pulse2Pulse now trains on leads I, II, V1–V6 (`leads: independent8`).
+
+---
+
+## Earlier reorganization
+
 Guide for migrating from the old structure to the new reorganized structure.
 
 ## What Changed

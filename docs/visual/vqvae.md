@@ -2,7 +2,7 @@
 
 The VQ-VAE turns each ECG into a sequence of **discrete code indices** (stage 1), and a separate
 autoregressive model learns which index sequences are likely (stage 2). Generation samples indices
-from the prior and decodes them. Code: `models/vqvae/`, losses: `training/losses/vqvae_losses.py`.
+from the prior and decodes them. Code: `src/ecgen/families/vqvae/`, losses: `src/ecgen/families/vqvae/losses.py`.
 Written reference: [VQ-VAE + Prior](../models/vqvae.md).
 
 ## Two stages at a glance

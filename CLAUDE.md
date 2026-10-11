@@ -11,44 +11,48 @@ The repo also ships the `ecgen` package (`src/ecgen/`) published to PyPI — `ec
 ## Commands
 
 ```bash
-pip install -e ".[dev]"     # installs only src/ecgen (+ pytest, black, flake8, mypy); extras: [hf], [plot], [all]
+pip install -e ".[dev]"     # installs src/ecgen (+ pytest, black, flake8, mypy); extras: [hf], [plot], [all]
 
-# The top-level research packages (models, data, training, ...) are NOT installed;
-# run from the repo root. pytest gets them via [tool.pytest.ini_options] pythonpath = ["."].
-pytest tests/                                          # all tests
+# pytest also sees the top-level research packages via [tool.pytest.ini_options] pythonpath = ["."].
+pytest tests/                                          # all tests (no MIMIC needed)
 pytest tests/test_models/test_vae.py::<test_name>      # single test
 black . && flake8 .
 
-# Training: shell wrappers cd to repo root and call scripts/train/*.py --config <yaml>
-./scripts/shell/run_train_vae_mimic_config.sh          # configs/experiments/vae_mimic.yaml
-./scripts/shell/run_train_vqvae_mimic.sh [config]      # VQ-VAE stage 1
-./scripts/shell/run_train_vqvae_prior_mimic.sh         # VQ-VAE stage 2 (PixelCNN prior)
-./scripts/shell/run_train_pulse2pulse_mimic.sh
-python scripts/train/train_vqvae_mimic.py --config configs/experiments/vqvae_mimic.yaml
+# Training: one runner for every family; dotted key=value overrides win over the YAML
+ecgen train configs/experiments/vae_mimic.yaml [key=value ...] [--resume ckpt] [--print-config]
+ecgen train configs/experiments/vqvae_mimic.yaml                     # VQ-VAE stage 1
+ecgen train configs/experiments/prior_mimic.yaml model.params.vqvae_checkpoint=<stage1.ckpt>
+ecgen train configs/experiments/pulse2pulse_mimic.yaml
+ecgen list                                             # registered families / datasets / callbacks
+python -m ecgen train ...                              # same without the console script
+./scripts/shell/run_train_*.sh [config] [key=value ...]  # thin wrappers around the runner
 ```
 
-Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.params.mimic_path` in the experiment YAMLs). Set `data.params.max_samples` (e.g. 1000) for quick smoke runs.
+Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.dataset.params.root` in the experiment YAMLs). Use `data.dataset.params.max_samples=1000` for quick runs, or `data.dataset.name=synthetic` (plus `trainer.accelerator=cpu`) to run without MIMIC.
 
 ## Architecture
 
-**Two code layouts coexist — be careful which one you touch.**
-- **New layout (current):** top-level packages `models/`, `data/`, `training/`, `evaluation/`, `visualization/`, `utils/`. Imports look like `from models.vqvae import VQVAELightning`, `from data.datasets.mimic.dataset import MIMICIVECGDataset`. See `MIGRATION_GUIDE.md` for the old→new import mapping.
-- **`src/ecgen/` (imported as `ecgen.*`):** the published PyPI package (the only thing `pyproject.toml` packages). It contains an older copy of the VAE/Pulse2Pulse model, data, and training code plus the newer `generate`/`plot`/`f` modules. Some research code still imports its older parts: `tests/test_models/test_vae.py`, `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_models_only.py`, `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`), `training/trainers/gan_trainer.py`, and `data/datasets/mimic/pulse2pulse_datamodule.py`. Those paths need `ecgen` installed (`pip install -e .`) or `PYTHONPATH=src` (the scripts' own `sys.path` hack resolves to the nonexistent `scripts/src`).
-- **`single_file/`:** a self-contained VQ-VAE (both stages) in `train_vqvae_standalone.py` with its own model/data/training code and `run_train_vqvae.sh`. Independent of the packages above; changes to `models/vqvae/` are not reflected there and vice versa.
+`PLAN_TRAINING_LIBRARY.md` is the roadmap (Phase 0 — contracts, registry, runner — is done; conditioning, diffusion, flow matching come next). Read §3–§7 before adding a family, conditioner, or dataset.
 
-**Model package pattern** (`models/vae/`, `models/vqvae/`): a dataclass config (`config.py`), a plain `nn.Module` (`*_1d.py`), and a `LightningModule` wrapper (`*_lightning.py`) that owns loss, optimizers, and `sample()`. Shared conv blocks live in `models/components/`; losses in `training/losses/` (`vae_losses.py`, `vqvae_losses.py`, `gan_losses.py`).
+**Where code lives.**
+- **`src/ecgen/` (imported as `ecgen.*`, the published package)** now holds the training stack: `ecgen.families.{vae,vqvae,gan}` (Lightning modules, configs, losses), `ecgen.families.base` (`GenerativeModule`, `Capabilities`), `ecgen.nn` (shared conv blocks), `ecgen.data` (datasets, `ECGDataModule`, collation, lead handling, `FeatureNormalizer`), `ecgen.training.{runner,callbacks}`, `ecgen.registry`, `ecgen.types`, `ecgen.cli`, plus `generate`/`plot`/`f`.
+- **Top-level `models/`, `training/callbacks|losses`, `utils/`, `data/datasets/{base,mimic}`** are now one-line re-export shims to the `ecgen.*` modules, kept for one release — edit the `ecgen.*` file, not the shim. `ecgen.models.{vae,pulse2pulse}` are shims too. Still-real top-level code: `evaluation/`, `visualization/`, `training/metrics/`, `training/losses/common.py`, `scripts/`. Don't add top-level packages to the wheel — their generic names (`models`, `data`, `utils`) would clash in site-packages.
+- **Legacy tuple loaders** `ecgen.data.mimic_dataset.MIMICIVECGDataset` and `ecgen.data.pulse2pulse_mimic` remain for old scripts; new code uses `ecgen.data.datasets.MIMICIVECG`.
+- **`single_file/`:** a self-contained VQ-VAE (both stages) in `train_vqvae_standalone.py`; independent of the package — changes to `ecgen.families.vqvae` are not reflected there and vice versa.
 
-**VQ-VAE is two-stage:** `VQVAELightning` (encoder → `VectorQuantizer` → decoder) is trained first; `PriorLightning` then loads a frozen stage-1 checkpoint via `vqvae_checkpoint` in `configs/experiments/prior_mimic.yaml` and trains a `PixelCNNPrior` over the discrete code indices. The prior is WaveNet-style (embedding shifted right by one, then dilated causal gated blocks), so logits at position t predict code t from codes < t — train with `PriorLightning.compute_loss`, never shift targets. Its `receptive_field` (1024 codes by default) should cover the latent length (625 for 5000 samples). Sampling = prior samples codes → VQ-VAE decodes.
+**Family pattern** (`ecgen/families/<family>/`): a dataclass config (`config.py`), a plain `nn.Module` (`*_1d.py`), `losses.py`, and a `GenerativeModule` subclass registered with `@FAMILIES.register("<name>")` that owns its own training logic (loss, optimizers, manual vs. automatic optimization) and `sample()`. Read batches with `self.get_signal(batch)` (accepts `ECGBatch` and the legacy dict/tuple formats). Registered names: `vae`, `vqvae`, `vqvae_prior`, `pulse2pulse`.
 
-**Configs:** `configs/experiments/*.yaml` are the entry points, with sections `experiment` (name, seed, runs_root), `wandb`, `model` (`target` + `params.config`), `data` (`target` + `params`), `callbacks`, `trainer`, `visualization`. Despite the `target:` fields, the train scripts do not instantiate generically — each script reads specific keys out of the YAML and maps them onto its argparse args, so a new config key needs matching handling in the script. `configs/{model,dataset,training}/` hold reusable fragments; `scripts/train/train_template.py` is the starting point for new models.
+**VQ-VAE is two-stage:** `VQVAELightning` (encoder → `VectorQuantizer` → decoder) is trained first; `PriorLightning` then loads a frozen stage-1 checkpoint via `model.params.vqvae_checkpoint` and trains a `PixelCNNPrior` over the discrete code indices. The prior is WaveNet-style (embedding shifted right by one, then dilated causal gated blocks), so logits at position t predict code t from codes < t — train with `PriorLightning.compute_loss`, never shift targets. Its `receptive_field` (1024 codes by default) should cover the latent length (625 for 5000 samples). Sampling = prior samples codes → VQ-VAE decodes.
 
-**Data:** `data/datasets/base.py` defines a `BaseECGDataset` (dict-returning) contract, but `MIMICIVECGDataset` is a plain `torch.utils.data.Dataset` that does *not* subclass it and returns a tuple `(ecg, features)`. Batch format is inconsistent across consumers (`VAEVisualizationCallback` expects tuples; `VAELightning` and Pulse2Pulse expect dicts) — check before wiring a dataset to a model. The dataset reads WFDB records, does a seeded subject-level train/val/test split internally (selected by `split=`), and yields `(num_leads, seq_length)` tensors (default 12 × 5000). Train scripts define their own `LightningDataModule` inline around it.
+**Configs and runner:** `configs/experiments/*.yaml` are the entry points, read by `ecgen.training.runner` (module docstring documents the schema). Sections: `experiment`, `model: {name|target, params}` (flat config-dataclass fields), `data: {dataset: {name|target, params}, batch_size, num_workers, split_params}`, `checkpoint`, `callbacks: [{name|target, params}]`, `trainer` (pl.Trainer kwargs), `wandb`, `resume`; unknown sections are rejected. Components are built from the registries in `ecgen.registry` (`FAMILIES`, `DATASETS`, `CALLBACKS`) by `name`, or by import path via `target`. Strings may use `${run_dir}`, `${name}`, `${seed}`; callbacks taking `save_dir` default to `${run_dir}/samples`. The runner checks the model's channel count / `seq_length` against the dataset before training.
 
-**Outputs:** runs go to `runs/<exp_name>/seed_<seed>/` (checkpoints named `epoch###-step######.ckpt` plus `last.ckpt` — there is no `best.ckpt`; TensorBoard logs under `tb/`). W&B logging is optional and enabled via the `wandb` config section. `training/callbacks/visualization.py` plots reconstructions/samples during training.
+**Data:** datasets subclass `ecgen.data.datasets.BaseECGDataset`, return dict samples `{"signal": [C,T], "cond": {...}, "cond_missing": {...}, "meta": {...}}`, and expose `lead_names`, `fs`, `seq_length`; `ECGDataModule` collates them into `ecgen.types.ECGBatch`. `MIMICIVECG` (`mimic_iv_ecg`) does the seeded subject-level split internally, fits the measurement normalizer on the train split only, and selects leads by name (`leads: null` = file order `I, II, III, aVR, aVF, aVL, V1–V6` — MIMIC stores aVF before aVL; aliases `standard12`, `independent8`). `scale: zscore` (per record, legacy) / `none` (mV) / number. `missing: drop` (legacy) vs `mask` (keeps rows; changes the split). `SyntheticECG` (`synthetic`) is for tests and smoke runs.
 
-**Checkpoint loading:** wrappers save the config as flat hyperparameters (`save_hyperparameters(config.__dict__)`) and accept `config=None, **kwargs` via `utils.config.resolve_config`, so plain `X.load_from_checkpoint(path)` works; keep that signature on new wrappers. `PriorLightning` records the stage-1 config in `vqvae_config`, so prior checkpoints restore the frozen VQ-VAE from their own weights. `tests/test_models/test_checkpoint_loading.py` covers this.
+**Outputs:** runs go to `runs/<exp_name>/seed_<seed>/` (`checkpoints/epoch###-step######.ckpt` plus `last.ckpt` — there is no `best.ckpt`; `samples/`, `metrics/train_val_metrics.json`, `tb/`, `config_resolved.yaml`, `metadata.json`). Each checkpoint also stores the `ECGDataModule` state (lead names, fs, seq_length, feature normalizer). W&B logging is optional via the `wandb` section.
 
-**Known pitfalls:** The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default) — use `VQVAELightning.downsample_factor` / `latent_length()` rather than hard-coding it. In the train scripts, YAML values override CLI flags (except the prior's `--vqvae-checkpoint`), and the YAML `callbacks:` section is ignored.
+**Checkpoint loading:** wrappers save the config as flat hyperparameters (`save_hyperparameters(config.__dict__)`) and accept `config=None, **kwargs` via `ecgen.utils.config.resolve_config`, so plain `X.load_from_checkpoint(path)` works; keep that signature on new wrappers. `PriorLightning` records the stage-1 config in `vqvae_config`, so prior checkpoints restore the frozen VQ-VAE from their own weights. `tests/test_models/test_checkpoint_loading.py` and `tests/test_training/test_runner.py` cover this.
+
+**Known pitfalls:** The VQ-VAE/VAE downsample by `2 ** (len(channel_multipliers) - 1)` (8× by default) — use `VQVAELightning.downsample_factor` / `latent_length()` rather than hard-coding it. PyYAML reads `1e-3` as a string; the runner's override parser converts it, but in YAML files write `0.001`. Pulse2Pulse configs use `leads: independent8` (I, II, V1–V6, the CSV columns `ecgen.generate` writes); checkpoints trained by the old script saw the first 8 file leads (I, II, III, aVR, aVF, aVL, V1, V2) instead.
 
 ## Documentation
 

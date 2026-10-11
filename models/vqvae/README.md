@@ -65,12 +65,11 @@ The prior model learns the distribution p(z) over discrete codes:
 Train the VQ-VAE autoencoder to learn discrete representations:
 
 ```bash
-# Using config file
+# Using the shell wrapper
 ./scripts/shell/run_train_vqvae_mimic.sh configs/experiments/vqvae_mimic.yaml
 
-# Or directly with Python
-python scripts/train/train_vqvae_mimic.py \
-    --config configs/experiments/vqvae_mimic.yaml
+# Or directly
+ecgen train configs/experiments/vqvae_mimic.yaml
 ```
 
 **Training tips:**
@@ -83,15 +82,14 @@ python scripts/train/train_vqvae_mimic.py \
 Train the PixelCNN prior on discrete codes from frozen VQ-VAE:
 
 ```bash
-# Using shell script (recommended)
-./scripts/shell/run_train_prior_mimic.sh \
-    runs/vqvae_mimic/seed_42/checkpoints/best.ckpt \
+# Using the shell wrapper
+./scripts/shell/run_train_vqvae_prior_mimic.sh \
+    runs/vqvae_mimic/seed_42/checkpoints/last.ckpt \
     configs/experiments/prior_mimic.yaml
 
-# Or directly with Python
-python scripts/train/train_prior_mimic.py \
-    --vqvae-checkpoint runs/vqvae_mimic/seed_42/checkpoints/best.ckpt \
-    --config configs/experiments/prior_mimic.yaml
+# Or directly
+ecgen train configs/experiments/prior_mimic.yaml \
+    model.params.vqvae_checkpoint=runs/vqvae_mimic/seed_42/checkpoints/last.ckpt
 ```
 
 **Training tips:**

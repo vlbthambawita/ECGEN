@@ -1,26 +1,45 @@
 # Training Callbacks
 
 Callbacks live in
-[`training/callbacks/visualization.py`](https://github.com/vlbthambawita/ECGEN/blob/main/training/callbacks/visualization.py)
-and are exported from `training.callbacks`:
+[`src/ecgen/training/callbacks/visualization.py`](https://github.com/vlbthambawita/ECGEN/blob/main/src/ecgen/training/callbacks/visualization.py)
+and are exported from `ecgen.training.callbacks`:
 
 ```python
-from training.callbacks import (
+from ecgen.training.callbacks import (
     VAEVisualizationCallback,
     ECGVisualizationCallback,
     GeneratedSamplesCallback,
 )
 ```
 
-`training/callbacks/checkpointing.py` (`CustomCheckpointCallback`) and
-`training/callbacks/logging.py` (`CustomLoggingCallback`) are empty placeholders.
+(`training.callbacks` at the repo root re-exports them for one release.)
+`ecgen.training.callbacks.checkpointing` (`CustomCheckpointCallback`) and
+`ecgen.training.callbacks.logging` (`CustomLoggingCallback`) are empty placeholders.
+
+## Registry names
+
+The runner builds the `callbacks:` list of an experiment YAML in order. Each entry is
+`{name: <registered name>, params: {...}}` or `{target: <import.path.Class>, params: {...}}`:
+
+| Name | Class |
+|---|---|
+| `vae_visualization` | `VAEVisualizationCallback` |
+| `ecg_visualization` | `ECGVisualizationCallback` |
+| `generated_samples` | `GeneratedSamplesCallback` |
+| `early_stopping` | `pytorch_lightning.callbacks.EarlyStopping` |
+| `lr_monitor` | `pytorch_lightning.callbacks.LearningRateMonitor` |
+| `model_checkpoint` | `pytorch_lightning.callbacks.ModelCheckpoint` |
+
+A callback whose constructor takes `save_dir` gets `${run_dir}/samples` if `params` does not set it.
+The main `ModelCheckpoint` is always added by the runner from the `checkpoint:` section, so
+`model_checkpoint` is only for an additional one.
 
 All three visualization callbacks act in `on_validation_epoch_end`, so they only fire on epochs where
 validation runs (`check_val_every_n_epoch`). They save PNGs with matplotlib's `Agg` backend.
 
 ## VAEVisualizationCallback
 
-Plots real vs reconstructed ECGs for autoencoders (used by the VAE and VQ-VAE training scripts).
+Plots real vs reconstructed ECGs for autoencoders (used by `vae_mimic.yaml` and `vqvae_mimic.yaml`).
 
 ```python
 VAEVisualizationCallback(
@@ -36,8 +55,9 @@ VAEVisualizationCallback(
 Behaviour:
 
 - Skipped during the sanity check and when `current_epoch % log_every_n_epochs != 0`.
-- Takes the **first batch** of `trainer.val_dataloaders`, unpacked as `ecg, _ = batch` (i.e. it
-  expects `(ecg, features)` tuples), and keeps the first `num_samples`.
+- Takes the **first batch** of `trainer.val_dataloaders`, reads the signal with
+  `ecgen.types.get_signal` (an `ECGBatch`, a `{"signal"}` / legacy `{"ecg_signals"}` dict, or an
+  `(ecg, features)` tuple), and keeps the first `num_samples`.
 - Reconstructs with `pl_module.vae(ecg)` if the module has a `vae` attribute, else
   `pl_module.vqvae(ecg)`, else `pl_module(ecg)`; the first element of the returned tuple is used.
 - Saves `save_dir/epoch_{epoch:04d}.png` (150 dpi), logs the figure to TensorBoard under the tag
@@ -76,36 +96,30 @@ sample (up to 8 leads) to `generated_epoch_{epoch:04d}.png`, and logs `samples/g
 
 ## Using callbacks
 
-The training scripts build their callbacks in code. In your own script:
+In an experiment YAML (from `vae_mimic.yaml`):
 
-```python
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from training.callbacks import VAEVisualizationCallback
+```yaml
+checkpoint:            # the runner's ModelCheckpoint
+  monitor: val_loss
+  mode: min
+  save_top_k: 3
 
-callbacks = [
-    ModelCheckpoint(
-        dirpath="runs/my_exp/seed_42/checkpoints",
-        filename="epoch{epoch:03d}-step{step:06d}",
-        auto_insert_metric_name=False,
-        monitor="val_loss", mode="min", save_top_k=3, save_last=True,
-    ),
-    EarlyStopping(monitor="val_loss", mode="min", patience=10),
-    LearningRateMonitor(logging_interval="step"),
-    VAEVisualizationCallback(save_dir="runs/my_exp/seed_42/samples", log_every_n_epochs=5),
-]
-
-trainer = pl.Trainer(callbacks=callbacks, max_epochs=100)
+callbacks:
+  - name: early_stopping
+    params: {monitor: val_loss, patience: 10, mode: min, verbose: true}
+  - name: lr_monitor
+    params: {logging_interval: step}
+  - name: vae_visualization          # save_dir defaults to ${run_dir}/samples
+    params:
+      log_every_n_epochs: 5
+      num_samples: 4
+      log_to_wandb: true
 ```
 
-All ECGEN LightningModules log `val_loss`, so it is the metric to monitor.
-
-### From YAML
-
-The `callbacks:` list in the experiment files (`target` + `params`) is only instantiated by
-`training/trainers/gan_trainer.py`. `train_vae_mimic.py`, `train_vqvae_mimic.py` and
-`train_prior_mimic.py` ignore it; they configure visualization through the `visualization:` section
-and early stopping / top-k through `--patience` / `--save-top-k`.
+Individual values can be changed from the command line, e.g.
+`ecgen train configs/experiments/vae_mimic.yaml callbacks.2.params.log_every_n_epochs=1`.
+The VAE, VQ-VAE and prior log `val_loss`; Pulse2Pulse checkpoints on `val/d_wasserstein`
+(`mode: max`).
 
 ## Custom callbacks
 
@@ -119,4 +133,13 @@ class MyCallback(pl.Callback):
         ...
 ```
 
-and add it to `training/callbacks/` and `training/callbacks/__init__.py` if it should be shared.
+then reference it from the YAML with `target: my_project.callbacks.MyCallback`, or register a name
+for it:
+
+```python
+from ecgen.registry import CALLBACKS
+
+CALLBACKS.add("my_callback", MyCallback)   # or @CALLBACKS.register("my_callback") on the class
+```
+
+Shared callbacks belong in `src/ecgen/training/callbacks/`, registered in its `__init__.py`.

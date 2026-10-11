@@ -62,7 +62,7 @@ def _git_info(start: Path) -> Dict[str, Any]:
 
 def collect_run_metadata(
     *,
-    config_path: Path,
+    config_path: Path | None,
     cfg: Dict[str, Any],
     run_dir: Path,
     argv: list[str] | None = None,
@@ -75,7 +75,7 @@ def collect_run_metadata(
 
     metadata: Dict[str, Any] = {
         "command": " ".join(argv or sys.argv),
-        "config_path": str(config_path.resolve()),
+        "config_path": str(config_path.resolve()) if config_path else None,
         "run_dir": str(run_dir.resolve()),
         "python": {
             "version": py_version,
@@ -90,7 +90,7 @@ def collect_run_metadata(
         "env": {
             "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES"),
         },
-        "git": _git_info(config_path.resolve()),
+        "git": _git_info(config_path.resolve() if config_path else Path.cwd()),
     }
 
     # Store a shallow copy of the experiment section for quick reference

@@ -166,28 +166,32 @@ The interactive HTML uses **D3 v7** and is fully self-contained (single file). F
 
 ## Training
 
-### VAE
+Every model family trains through one runner, driven by an experiment YAML in
+`configs/experiments/`. `key=value` overrides are applied after the YAML.
 
 ```bash
-# Config-driven (recommended)
-python scripts/train/train_vae_mimic.py --config configs/experiments/vae_mimic.yaml
+ecgen train configs/experiments/vae_mimic.yaml          # VAE
+ecgen train configs/experiments/pulse2pulse_mimic.yaml  # Pulse2Pulse GAN
+ecgen train configs/experiments/vqvae_mimic.yaml        # VQ-VAE stage 1
+ecgen train configs/experiments/prior_mimic.yaml \
+  model.params.vqvae_checkpoint=runs/vqvae_mimic/seed_42/checkpoints/last.ckpt  # stage 2
 
 # Quick test with a small subset
-python scripts/train/train_vae_mimic.py \
-  --data-dir /path/to/mimic-iv-ecg \
-  --max-samples 1000 --max-epochs 10 --batch-size 16
+ecgen train configs/experiments/vae_mimic.yaml \
+  data.dataset.params.max_samples=1000 trainer.max_epochs=10 data.batch_size=16
 
-# Resume from checkpoint
-python scripts/train/train_vae_mimic.py \
-  --config configs/experiments/vae_mimic.yaml \
-  --resume runs/vae_mimic/seed_42/checkpoints/last.ckpt
+# Smoke run without MIMIC
+ecgen train configs/experiments/vae_mimic.yaml \
+  data.dataset.name=synthetic "data.dataset.params={num_samples: 64}" trainer.accelerator=cpu
+
+# Resume, inspect the resolved config, list registered models/datasets/callbacks
+ecgen train configs/experiments/vae_mimic.yaml --resume runs/vae_mimic/seed_42/checkpoints/last.ckpt
+ecgen train configs/experiments/vae_mimic.yaml --print-config
+ecgen list
 ```
 
-### Pulse2Pulse
-
-```bash
-python -m ecgen.training.train --config configs/experiments/pulse2pulse_mimic.yaml
-```
+`python -m ecgen train ...` works without the console script. The shell wrappers in
+`scripts/shell/` call the same runner.
 
 Run outputs are saved to `runs/{experiment_name}/seed_{seed}/` containing:
 - `checkpoints/` — best and last model weights
@@ -295,7 +299,7 @@ pytest tests/
 
 # VQ-VAE stage 1, then the PixelCNN prior (stage 2)
 ./scripts/shell/run_train_vqvae_mimic.sh
-./scripts/shell/run_train_vqvae_prior_mimic.sh
+./scripts/shell/run_train_vqvae_prior_mimic.sh runs/vqvae_mimic/seed_42/checkpoints/last.ckpt
 ```
 
 Full documentation: **https://vajira.info/ECGEN/** (source in `docs/`, built with MkDocs Material).

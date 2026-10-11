@@ -14,14 +14,31 @@ import numpy as np
 import torch
 from pytorch_lightning import Callback, LightningModule, Trainer
 
+from ecgen.types import get_signal
+
 LEAD_NAMES_8 = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2"]
 LEAD_NAMES_12 = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
+
+
+def _datamodule_lead_names(trainer: Trainer, default: list[str]) -> list[str]:
+    """Lead names of the training data (ECGDataModule), else ``default``."""
+    dm = getattr(trainer, "datamodule", None)
+    try:
+        return list(dm.reference_dataset.lead_names)
+    except (AttributeError, RuntimeError):
+        return default
+
+
+def _name(names: list[str], i: int, fallback: str) -> str:
+    return names[i] if i < len(names) else fallback
 
 
 class ECGVisualizationCallback(Callback):
     """
     Callback to visualize real vs generated ECG samples during training.
     """
+
+    lead_names: list[str] = LEAD_NAMES_8  # replaced by the datamodule's leads at runtime
 
     def __init__(
         self,
@@ -36,6 +53,7 @@ class ECGVisualizationCallback(Callback):
         self.n_samples = n_samples
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        self.lead_names = _datamodule_lead_names(trainer, LEAD_NAMES_8)
         if trainer.current_epoch % self.every_n_epochs != 0:
             return
 
@@ -82,11 +100,11 @@ class ECGVisualizationCallback(Callback):
 
         for i in range(n_leads):
             axs[i, 0].plot(real_np[i], color="C0", linewidth=0.7)
-            axs[i, 0].set_title(f"Real - {LEAD_NAMES_8[i] if i < len(LEAD_NAMES_8) else f'Lead {i}'}")
+            axs[i, 0].set_title(f"Real - {_name(self.lead_names, i, f'Lead {i}')}")
             axs[i, 0].set_xlim(0, real_np.shape[-1])
 
             axs[i, 1].plot(fake_np[i], color="C1", linewidth=0.7)
-            axs[i, 1].set_title(f"Generated - {LEAD_NAMES_8[i] if i < len(LEAD_NAMES_8) else f'Lead {i}'}")
+            axs[i, 1].set_title(f"Generated - {_name(self.lead_names, i, f'Lead {i}')}")
             axs[i, 1].set_xlim(0, fake_np.shape[-1])
 
         axs[-1, 0].set_xlabel("Time (samples)")
@@ -102,6 +120,8 @@ class GeneratedSamplesCallback(Callback):
     Callback to generate and save ECG samples periodically.
     """
 
+    lead_names: list[str] = LEAD_NAMES_8  # replaced by the datamodule's leads at runtime
+
     def __init__(
         self,
         save_dir: str | Path,
@@ -115,6 +135,7 @@ class GeneratedSamplesCallback(Callback):
         self.n_samples = n_samples
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        self.lead_names = _datamodule_lead_names(trainer, LEAD_NAMES_8)
         if trainer.current_epoch % self.every_n_epochs != 0:
             return
 
@@ -158,7 +179,7 @@ class GeneratedSamplesCallback(Callback):
 
         for i in range(n_leads):
             axs[i].plot(fake_np[i], color="C1", linewidth=0.7)
-            axs[i].set_ylabel(LEAD_NAMES_8[i] if i < len(LEAD_NAMES_8) else f"L{i}")
+            axs[i].set_ylabel(_name(self.lead_names, i, f"L{i}"))
             axs[i].set_xlim(0, fake_np.shape[-1])
 
         axs[-1].set_xlabel("Time (samples)")
@@ -174,6 +195,8 @@ class VAEVisualizationCallback(Callback):
     
     Saves comparison plots of real vs reconstructed ECG signals at specified intervals.
     """
+
+    lead_names: list[str] = LEAD_NAMES_12  # replaced by the datamodule's leads at runtime
     
     def __init__(
         self,
@@ -203,7 +226,12 @@ class VAEVisualizationCallback(Callback):
         self.log_to_wandb = log_to_wandb
     
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        self.lead_names = _datamodule_lead_names(trainer, LEAD_NAMES_12)
         """Called at the end of validation epoch."""
+        # Skip during sanity check
+        if trainer.sanity_checking:
+            return
+            
         current_epoch = trainer.current_epoch
         
         # Only log at specified intervals
@@ -217,7 +245,7 @@ class VAEVisualizationCallback(Callback):
         
         # Get a batch of validation data
         batch = next(iter(val_dataloader))
-        ecg, _ = batch
+        ecg = get_signal(batch)
         
         # Move to device
         ecg = ecg.to(pl_module.device)
@@ -230,6 +258,8 @@ class VAEVisualizationCallback(Callback):
         with torch.no_grad():
             if hasattr(pl_module, 'vae'):
                 recon, _, _ = pl_module.vae(ecg)
+            elif hasattr(pl_module, 'vqvae'):
+                recon, _, _ = pl_module.vqvae(ecg)
             else:
                 recon, _, _ = pl_module(ecg)
         pl_module.train()
@@ -249,7 +279,9 @@ class VAEVisualizationCallback(Callback):
         fig.savefig(save_path, dpi=150, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"[Epoch {current_epoch}] Saved VAE visualization to: {save_path}")
+        print(f"\n{'='*60}")
+        print(f"[Epoch {current_epoch}] Saved visualization to: {save_path}")
+        print(f"{'='*60}\n")
         
         # Log to TensorBoard
         if self.log_to_tensorboard and trainer.logger is not None:
@@ -326,7 +358,7 @@ class VAEVisualizationCallback(Callback):
                 
                 # Add lead name on top
                 if sample_idx == 0:
-                    lead_name = LEAD_NAMES_12[lead_idx] if lead_idx < len(LEAD_NAMES_12) else f"L{lead_idx}"
+                    lead_name = _name(self.lead_names, lead_idx, f"L{lead_idx}")
                     ax_real.set_title(lead_name, fontsize=9)
                 
                 # Remove x-axis labels for real (top row of each sample)
@@ -384,7 +416,7 @@ class VAEVisualizationCallback(Callback):
             # Plot real ECG
             ax_real = axes[sample_idx][0]
             for lead_idx in range(n_leads):
-                lead_name = LEAD_NAMES_12[lead_idx] if lead_idx < len(LEAD_NAMES_12) else f"L{lead_idx}"
+                lead_name = _name(self.lead_names, lead_idx, f"L{lead_idx}")
                 ax_real.plot(
                     real_ecg[lead_idx],
                     linewidth=0.5,
@@ -400,7 +432,7 @@ class VAEVisualizationCallback(Callback):
             # Plot reconstructed ECG
             ax_recon = axes[sample_idx][1]
             for lead_idx in range(n_leads):
-                lead_name = LEAD_NAMES_12[lead_idx] if lead_idx < len(LEAD_NAMES_12) else f"L{lead_idx}"
+                lead_name = _name(self.lead_names, lead_idx, f"L{lead_idx}")
                 ax_recon.plot(
                     recon_ecg[lead_idx],
                     linewidth=0.5,

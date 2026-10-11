@@ -1,3 +1,6 @@
+# Pulse2Pulse (WaveGAN, WGAN-GP) on MIMIC-IV-ECG.
+#   ecgen train configs/experiments/pulse2pulse_mimic.yaml [key=value ...]
+
 experiment:
   name: pulse2pulse_mimic
   seed: 42
@@ -6,57 +9,55 @@ experiment:
 wandb:
   enabled: true
   project: ecg-pulse2pulse
-  entity: null  # Set to your wandb username/team or leave null for default
-  run_name: null  # Auto-generated if null
-  tags:
-    - pulse2pulse
-    - wavegan
-    - ecg-generation
+  entity: null
+  run_name: null
+  tags: [pulse2pulse, wavegan, ecg-generation]
   notes: "Pulse2Pulse WaveGAN training on MIMIC-IV-ECG"
-  log_model: False  # Log model checkpoints to wandb
-  log_freq: 50  # Log frequency (steps)
+  log_model: false
 
 model:
-  target: ecgen.models.pulse2pulse.Pulse2PulseGAN
+  name: pulse2pulse         # ecgen.families.gan.Pulse2PulseGAN
   params:
-    config:
-      model_size: 50
-      num_channels: 8
-      seq_length: 5000
-      lr: 0.0001
-      b1: 0.5
-      b2: 0.9
-      lmbda: 10.0
-      n_critic: 5
+    model_size: 50
+    num_channels: 8
+    seq_length: 5000
+    lr: 0.0001
+    b1: 0.5
+    b2: 0.9
+    lmbda: 10.0
+    n_critic: 5
 
 data:
-  target: ecgen.data.pulse2pulse_mimic.Pulse2PulseMIMICDataModule
-  params:
-    config:
-      data_dir: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
-      batch_size: 128
-      num_workers: 4
-      max_samples: 10000  # Use full dataset (set to 1000 for quick testing)
-      skip_missing_check: False
-      num_channels: 8
+  dataset:
+    name: mimic_iv_ecg
+    params:
+      root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+      max_samples: 10000
+      skip_missing_check: false
+      # The 8 independent leads, matching the CSV columns written by ecgen.generate.
+      # (The legacy script took the first 8 file leads: I, II, III, aVR, aVF, aVL, V1, V2.)
+      leads: independent8   # I, II, V1-V6
       seq_length: 5000
+      scale: zscore
+  split_params:
+    val: {max_samples: 1000}
+  batch_size: 128
+  num_workers: 4
+
+checkpoint:
+  monitor: val/d_wasserstein
+  mode: max
+  save_top_k: 3
 
 callbacks:
-  - target: ecgen.training.callbacks.ECGVisualizationCallback
-    params:
-      save_dir: runs/pulse2pulse_mimic/seed_42/samples
-      every_n_epochs: 10
-      n_samples: 1
-  - target: ecgen.training.callbacks.GeneratedSamplesCallback
-    params:
-      save_dir: runs/pulse2pulse_mimic/seed_42/samples
-      every_n_epochs: 25
-      n_samples: 16
+  - name: ecg_visualization
+    params: {every_n_epochs: 10, n_samples: 1}
+  - name: generated_samples
+    params: {every_n_epochs: 25, n_samples: 16}
 
 trainer:
   max_epochs: 300
-  accelerator: "gpu"
+  accelerator: gpu
   devices: [0]
   log_every_n_steps: 50
   check_val_every_n_epoch: 5
-

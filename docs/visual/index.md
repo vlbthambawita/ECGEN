@@ -11,8 +11,8 @@ a diagram to change its inputs.
 | [VQ-VAE + Prior](vqvae.md) | `VQVAE1D` + `PixelCNNPrior` | code indices sampled by an autoregressive prior |
 | [Pulse2Pulse GAN](pulse2pulse.md) | `WaveGANGenerator` + `WaveGANDiscriminator` | uniform noise with the shape of an ECG |
 
-All shapes and hyper-parameters in the diagrams are the **defaults** in `models/` and
-`training/losses/`. The written reference for each model is under *Models*
+All shapes and hyper-parameters in the diagrams are the **defaults** in `src/ecgen/families/` and
+`src/ecgen/nn/`. The written reference for each model is under *Models*
 ([VAE](../models/vae.md), [VQ-VAE](../models/vqvae.md), [Pulse2Pulse](../models/gan.md)).
 
 ## Legend
@@ -30,9 +30,9 @@ All shapes and hyper-parameters in the diagrams are the **defaults** in `models/
 
 ## The input: a 12-lead ECG
 
-Every model works on a tensor of shape `(batch, leads, samples)`. `MIMICIVECGDataset` yields
-12 leads × 5000 samples (10 s at 500 Hz). Pulse2Pulse keeps only the first 8 channels
-(`num_channels=8`: I, II, III, aVR, aVL, aVF, V1, V2).
+Every model works on a tensor of shape `(batch, leads, samples)`. `MIMICIVECG` yields
+12 leads × 5000 samples (10 s at 500 Hz) by default. Pulse2Pulse uses 8 channels
+(`num_channels=8`, selected with `leads: independent8`: I, II, V1–V6).
 
 <figure class="arch" data-widget="leads">
 <svg viewBox="0 0 760 290" role="img" aria-label="Twelve-lead ECG grid">
@@ -92,7 +92,7 @@ from random numbers to a `(n, leads, 5000)` tensor:
 
 ## Shared backbone: `Encoder1D` / `Decoder1D`
 
-The VAE and the VQ-VAE use the same convolutional encoder and decoder from `models/components/`.
+The VAE and the VQ-VAE use the same convolutional encoder and decoder from `src/ecgen/nn/`.
 They differ only in the latent bottleneck: the VAE samples a Gaussian latent with 8 channels, and the
 VQ-VAE snaps a 64-channel latent to a codebook. Switch between them below:
 

@@ -2,7 +2,7 @@
 
 ECGEN has two visualization pieces:
 
-1. **During training** — `VAEVisualizationCallback` (in `training/callbacks/visualization.py`) saves
+1. **During training** — `VAEVisualizationCallback` (in `src/ecgen/training/callbacks/visualization.py`) saves
    real-vs-reconstruction plots for the VAE and VQ-VAE.
 2. **Offline** — the `visualization` package (`visualization/ecg_plots.py`, `latent_space.py`,
    `training_curves.py`) with plotting helpers that return matplotlib figures.
@@ -12,36 +12,44 @@ GAN-specific callbacks (`ECGVisualizationCallback`, `GeneratedSamplesCallback`) 
 
 ## Reconstruction plots during training
 
-`train_vae_mimic.py` and `train_vqvae_mimic.py` add a `VAEVisualizationCallback` automatically,
-configured from the `visualization:` section of the experiment YAML:
+`vae_mimic.yaml` and `vqvae_mimic.yaml` list a `vae_visualization` callback in `callbacks:`; its
+`params` are the `VAEVisualizationCallback` arguments:
 
 ```yaml
-visualization:
-  every_n_epochs: 5         # plot every N epochs (only on epochs where validation runs)
-  num_samples: 4            # ECGs per plot, taken from the first validation batch
-  plot_all_leads: true      # true: one subplot per lead; false: all leads overlaid
-  log_to_tensorboard: false
-  log_to_wandb: true        # also needs wandb.enabled: true
+callbacks:
+  - name: vae_visualization
+    params:
+      log_every_n_epochs: 5     # plot every N epochs (only on epochs where validation runs)
+      num_samples: 4            # ECGs per plot, taken from the first validation batch
+      plot_all_leads: true      # true: one subplot per lead; false: all leads overlaid
+      log_to_tensorboard: false
+      log_to_wandb: true        # also needs wandb.enabled: true
+      # save_dir defaults to ${run_dir}/samples
 ```
 
-or, without a config, with `--viz-every-n-epochs`, `--viz-num-samples`, `--viz-plot-all-leads` and
-`--viz-log-to-wandb` (`--viz-log-to-tensorboard` defaults to on). As with every key, values in the
-YAML override these flags. The prior script (`train_prior_mimic.py`) has no visualization.
+Change a value from the command line with e.g. `callbacks.2.params.log_every_n_epochs=1` (the index
+is the entry's position in the list). The prior config (`prior_mimic.yaml`) has no visualization.
+The old top-level `visualization:` section is no longer accepted.
 
 !!! warning "Plots appear only on validation epochs"
     The callback runs in `on_validation_epoch_end`, skips the sanity check, and fires when
-    `current_epoch % every_n_epochs == 0` (0-based epochs). Lightning validates when
+    `current_epoch % log_every_n_epochs == 0` (0-based epochs). Lightning validates when
     `(current_epoch + 1) % check_val_every_n_epoch == 0`, i.e. on epochs 4, 9, 14, ... for
     `check_val_every_n_epoch: 5`. A plot is produced only on epochs that satisfy both conditions —
     in particular, the shipped
-    `vae_mimic.yaml` (`check_val_every_n_epoch: 5`, `every_n_epochs: 5`) **never** produces a plot.
-    Use `every_n_epochs: 1` (as `vqvae_mimic.yaml` does) to plot on every validation epoch.
+    `vae_mimic.yaml` (`check_val_every_n_epoch: 5`, `log_every_n_epochs: 5`) **never** produces a
+    plot. Use `log_every_n_epochs: 1` (as `vqvae_mimic.yaml` does) to plot on every validation epoch.
 
 ### Plot layouts
 
 **`plot_all_leads: true`** — a grid with `2 × num_samples` rows and one column per lead: for each
-sample a "Real" row (blue) above a "Recon" row (orange). Columns are titled with the standard lead
+sample a "Real" row (blue) above a "Recon" row (orange). Columns are titled with the fixed lead
 names `I, II, III, aVR, aVL, aVF, V1–V6`.
+
+!!! note "Lead titles are fixed"
+    The titles do not come from the batch's `lead_names`. MIMIC-IV-ECG stores aVF before aVL, so
+    with the default `leads: null` the aVL/aVF titles are swapped, and with any other lead selection
+    (e.g. `independent8`) the titles do not match the channels.
 
 **`plot_all_leads: false`** — `num_samples` rows × 2 columns ("Real" and "Reconstructed"), with all
 leads overlaid in each panel and a lead legend on the first row.
@@ -65,7 +73,7 @@ ls runs/vae_mimic/seed_42/samples/
 
 ```python
 import pytorch_lightning as pl
-from training.callbacks import VAEVisualizationCallback
+from ecgen.training.callbacks import VAEVisualizationCallback
 
 viz = VAEVisualizationCallback(
     save_dir="runs/my_exp/seed_42/samples",
@@ -80,7 +88,8 @@ trainer = pl.Trainer(callbacks=[viz], max_epochs=10)
 
 Requirements on the model and data:
 
-- validation batches must be `(ecg, features)` tuples (as produced by `MIMICIVECGDataset`);
+- validation batches must contain an ECG tensor readable by `ecgen.types.get_signal` (an `ECGBatch`
+  from `ECGDataModule`, a `{"signal"}` / legacy `{"ecg_signals"}` dict, or an `(ecg, features)` tuple);
 - the LightningModule must expose `vae` or `vqvae` (or be callable itself) returning a tuple whose
   first element is the reconstruction.
 
@@ -95,10 +104,10 @@ Requirements on the model and data:
 ### Troubleshooting
 
 - **No images**: validation runs on 0-based epochs `e` with `(e + 1) % check_val_every_n_epoch == 0`,
-  and the callback needs `e % every_n_epochs == 0` on such an epoch (see the warning above). Setting
-  `every_n_epochs: 1` always works. Images are also skipped during the sanity check.
+  and the callback needs `e % log_every_n_epochs == 0` on such an epoch (see the warning above). Setting
+  `log_every_n_epochs: 1` always works. Images are also skipped during the sanity check.
 - **Nothing in TensorBoard**: `configs/experiments/vae_mimic.yaml` and `vqvae_mimic.yaml` ship with
-  `log_to_tensorboard: false`; set it to `true`.
+  `log_to_tensorboard: false`; set it to `true` (e.g. `callbacks.2.params.log_to_tensorboard=true`).
 - **Large figures / memory**: lower `num_samples` or use `plot_all_leads: false`.
 
 ## The `visualization` package
@@ -144,15 +153,15 @@ can be `torch.Tensor` or `numpy.ndarray`; time axes are in seconds using `sampli
 
 ```python
 import torch
-from models.vae import VAELightning
-from data.datasets.mimic.dataset import MIMICIVECGDataset
+from ecgen.families.vae import VAELightning
+from ecgen.data.datasets import MIMICIVECG
 from visualization import plot_ecg_leads, plot_ecg_comparison, plot_latent_space_2d
 
 model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()
 
-ds = MIMICIVECGDataset(mimic_path="/path/to/mimic-iv-ecg", split="test", max_samples=64)
-x = torch.stack([ds[i][0] for i in range(64)])        # (64, 12, 5000)
+ds = MIMICIVECG(root="/path/to/mimic-iv-ecg", split="test", max_samples=64)
+x = torch.stack([ds[i]["signal"] for i in range(64)])  # (64, 12, 5000)
 
 recon = model.reconstruct(x)
 plot_ecg_comparison(x[0], recon[0], lead_idx=1, lead_name="II").savefig("lead_II.png")

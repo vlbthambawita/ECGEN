@@ -2,19 +2,34 @@
 
 Auto-generated from docstrings.
 
-## `data.datasets.base`
+## `ecgen.types`
 
-::: data.datasets.base
+::: ecgen.types
 
-## `data.datasets.mimic.dataset`
+## `ecgen.data.datasets.base`
 
-::: data.datasets.mimic.dataset
+::: ecgen.data.datasets.base
 
-## `data.datasets.mimic.datamodule`
+## `ecgen.data.datasets.mimic`
 
-::: data.datasets.mimic.datamodule
+::: ecgen.data.datasets.mimic
 
-## `data.datasets.mimic.pulse2pulse_datamodule`
+## `ecgen.data.datasets.synthetic`
 
-::: data.datasets.mimic.pulse2pulse_datamodule
+::: ecgen.data.datasets.synthetic
 
+## `ecgen.data.leads`
+
+::: ecgen.data.leads
+
+## `ecgen.data.normalizers`
+
+::: ecgen.data.normalizers
+
+## `ecgen.data.collate`
+
+::: ecgen.data.collate
+
+## `ecgen.data.datamodule`
+
+::: ecgen.data.datamodule

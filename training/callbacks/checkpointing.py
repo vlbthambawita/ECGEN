@@ -1,12 +1,3 @@
-"""Custom checkpoint callbacks (future implementation)."""
+"""Deprecated shim: moved to :mod:`ecgen.training.callbacks.checkpointing`."""
 
-import pytorch_lightning as pl
-
-
-class CustomCheckpointCallback(pl.Callback):
-    """
-    Custom checkpoint callback for specialized checkpoint saving.
-    
-    Future implementation for model-specific checkpointing strategies.
-    """
-    pass
+from ecgen.training.callbacks.checkpointing import *  # noqa: F401,F403

@@ -5,7 +5,7 @@ hide:
 
 # ECGEN
 
-**ECGEN** is a research framework for generative modeling of **12-lead electrocardiograms**, built on [PyTorch Lightning](https://lightning.ai/). It provides model implementations, dataset loaders, training scripts, evaluation metrics and visualization tools under one config-driven workflow.
+**ECGEN** is a research framework for generative modeling of **12-lead electrocardiograms**, built on [PyTorch Lightning](https://lightning.ai/). It provides model implementations, dataset loaders, one YAML-driven training command (`ecgen train`), evaluation metrics and visualization tools.
 
 <div class="grid cards" markdown>
 
@@ -30,9 +30,9 @@ hide:
 
     ---
 
-    YAML-configured experiments, callbacks, TensorBoard and W&B logging.
+    One command for every model: `ecgen train <config.yaml> [key=value ...]`.
 
-    [:octicons-arrow-right-24: Training guide](training/guide.md)
+    [:octicons-arrow-right-24: Training with `ecgen train`](training/runner.md)
 
 -   :material-api:{ .lg .middle } **API reference**
 
@@ -46,19 +46,20 @@ hide:
 
 ## Model families
 
-| Family | Package | Status | Docs |
-|---|---|---|---|
-| Variational Autoencoder | `models.vae` | Available | [VAE](models/vae.md) |
-| VQ-VAE + PixelCNN prior | `models.vqvae` | Available | [VQ-VAE](models/vqvae.md) |
-| Pulse2Pulse GAN | `models.gan` | Available | [GAN](models/gan.md) |
-| Diffusion | `models.diffusion` | Planned | — |
-| State Space Models | `models.ssm` | Planned | — |
+| Family | Package | `model.name` | Status | Docs |
+|---|---|---|---|---|
+| Variational Autoencoder | `ecgen.families.vae` | `vae` | Available | [VAE](models/vae.md) |
+| VQ-VAE + PixelCNN prior | `ecgen.families.vqvae` | `vqvae`, `vqvae_prior` | Available | [VQ-VAE](models/vqvae.md) |
+| Pulse2Pulse GAN | `ecgen.families.gan` | `pulse2pulse` | Available | [GAN](models/gan.md) |
+| Diffusion | — | — | Planned | — |
+| State Space Models | — | — | Planned | — |
 
 ## Datasets
 
 | Dataset | Status | Docs |
 |---|---|---|
-| MIMIC-IV-ECG | Available | [MIMIC-IV-ECG](datasets/mimic.md) |
+| MIMIC-IV-ECG (`mimic_iv_ecg`) | Available | [MIMIC-IV-ECG](datasets/mimic.md) |
+| Synthetic ECG-like signals (`synthetic`) | Available, for smoke tests | [Smoke runs](training/runner.md#smoke-runs-without-data) |
 | PTB-XL | Planned (config only) | — |
 | Your own data | — | [Adding a dataset](datasets/custom.md) |
 
@@ -69,32 +70,37 @@ git clone https://github.com/vlbthambawita/ECGEN.git
 cd ECGEN
 pip install -e .
 
-# Train a VQ-VAE (stage 1) with configs/experiments/vqvae_mimic.yaml
-./scripts/shell/run_train_vqvae_mimic.sh
+# Train a VQ-VAE (stage 1); overrides follow the config
+ecgen train configs/experiments/vqvae_mimic.yaml data.dataset.params.root=/path/to/mimic-iv-ecg
+
+# then its prior (stage 2)
+ecgen train configs/experiments/prior_mimic.yaml \
+    model.params.vqvae_checkpoint=runs/vqvae_mimic/seed_42/checkpoints/last.ckpt
 ```
 
 ```python
-from models.vae import VAELightning
+from ecgen.families.vae import VAELightning
 
 model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt")
 samples = model.sample(n_samples=16, seq_length=5000)
 ```
 
 !!! note
-    See the [training guide](training/guide.md) for every model's entry point and its known caveats.
+    See [Training with `ecgen train`](training/runner.md) for the CLI, the config schema and the run directory layout.
     The Lightning wrappers rebuild their config from the flat hyperparameters stored in the checkpoint, so `load_from_checkpoint(path)` needs no extra arguments. See [VAE](models/vae.md) for details.
 
 ## Repository layout
 
 ```text
 ECGEN/
-├── models/          # vae/, vqvae/, gan/, diffusion/, ssm/, components/
-├── data/            # datasets/ (base class + MIMIC-IV-ECG)
-├── training/        # callbacks/, losses/, metrics/, trainers/
+├── src/ecgen/       # installed package: families/, nn/, data/, training/ (runner, callbacks), cli.py
+├── models/          # compatibility shims; diffusion/, ssm/ placeholders
+├── data/            # compatibility shims for the old dataset paths
+├── training/        # metrics/, losses/common.py, trainers/ (+ shims)
 ├── evaluation/      # metrics/, benchmark.py, visualize.py
 ├── visualization/   # ECG plots, latent space, training curves
-├── utils/           # seeding, I/O, logging, run metadata
-├── scripts/         # train/, generate/, evaluate/, data/, shell/
+├── utils/           # compatibility shims to ecgen.utils
+├── scripts/         # shell/ (run_train_*.sh), generate/, evaluate/, data/
 ├── configs/         # dataset/, model/, training/, experiments/
 ├── single_file/     # self-contained VQ-VAE implementation
 └── docs/            # this documentation

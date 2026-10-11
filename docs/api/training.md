@@ -2,33 +2,45 @@
 
 Auto-generated from docstrings.
 
+## `ecgen.training.runner`
+
+::: ecgen.training.runner
+
+## `ecgen.cli`
+
+::: ecgen.cli
+
+## `ecgen.registry`
+
+::: ecgen.registry
+
 ## `training.losses.common`
 
 ::: training.losses.common
 
-## `training.losses.vae_losses`
+## `ecgen.families.vae.losses`
 
-::: training.losses.vae_losses
+::: ecgen.families.vae.losses
 
-## `training.losses.vqvae_losses`
+## `ecgen.families.vqvae.losses`
 
-::: training.losses.vqvae_losses
+::: ecgen.families.vqvae.losses
 
-## `training.losses.gan_losses`
+## `ecgen.families.gan.losses`
 
-::: training.losses.gan_losses
+::: ecgen.families.gan.losses
 
-## `training.callbacks.checkpointing`
+## `ecgen.training.callbacks.checkpointing`
 
-::: training.callbacks.checkpointing
+::: ecgen.training.callbacks.checkpointing
 
-## `training.callbacks.logging`
+## `ecgen.training.callbacks.logging`
 
-::: training.callbacks.logging
+::: ecgen.training.callbacks.logging
 
-## `training.callbacks.visualization`
+## `ecgen.training.callbacks.visualization`
 
-::: training.callbacks.visualization
+::: ecgen.training.callbacks.visualization
 
 ## `training.metrics.reconstruction`
 
@@ -49,8 +61,3 @@ Auto-generated from docstrings.
 ## `training.trainers.vae_trainer`
 
 ::: training.trainers.vae_trainer
-
-## `training.trainers.gan_trainer`
-
-::: training.trainers.gan_trainer
-

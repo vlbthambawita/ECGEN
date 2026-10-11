@@ -16,28 +16,14 @@ For training and sample generation, see [Pulse2Pulse Training](../training/pulse
 
 ## Where the code lives
 
-The implementation exists twice. The copies share the same architecture, config fields and
-parameter names, but only the new-layout copy has the checkpoint-loading fixes
-(`config=None, **kwargs` constructor and `on_load_checkpoint`, see
-[Loading a checkpoint](#loading-a-checkpoint)):
+`src/ecgen/families/gan/pulse2pulse.py` (`ecgen.families.gan.pulse2pulse`, also exported from
+`ecgen.families.gan`), registered with the training runner as **`pulse2pulse`**. The old import
+paths `models.gan.pulse2pulse` and `ecgen.models.pulse2pulse` are re-export shims kept for one
+release; `scripts/generate/generate_pulse2pulse.py` still imports through `models.gan.pulse2pulse`.
 
-| File | Import path | Used by |
-|------|-------------|---------|
-| `models/gan/pulse2pulse.py` | `models.gan.pulse2pulse` | `scripts/generate/generate_pulse2pulse.py`; installed by `pip install -e .` |
-| `src/ecgen/models/pulse2pulse.py` | `ecgen.models.pulse2pulse` (legacy) | `scripts/train/train_pulse2pulse.py`, `scripts/utils/test_pulse2pulse_setup.py` |
-
-!!! note "Which import should I use?"
-    The shipped training script imports the **legacy** `ecgen.models.pulse2pulse` module
-    (the generate script uses the new layout).
-    In your own code, prefer the new layout:
-
-    ```python
-    from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
-    ```
-
-    `models/gan/__init__.py` re-exports nothing, so `from models.gan import Pulse2Pulse`
-    (shown in `models/gan/README.md`) does **not** work. Import from the
-    `models.gan.pulse2pulse` submodule.
+```python
+from ecgen.families.gan import Pulse2PulseGAN, Pulse2PulseConfig
+```
 
 The public names in the module are:
 
@@ -173,15 +159,16 @@ class Pulse2PulseConfig:
 
 !!! note "`configs/model/gan/pulse2pulse.yaml` is not used"
     That fragment (`latent_dim`, `base_channels`, `lr_g`, `lr_d`, `b2: 0.999`, ...) does not
-    match `Pulse2PulseConfig`, and no script reads it. The values that take effect are the
-    `Pulse2PulseConfig` defaults or the train script's CLI flags. See
+    match `Pulse2PulseConfig`, and nothing reads it. The values that take effect are the
+    `Pulse2PulseConfig` defaults overridden by `model.params` in
+    `configs/experiments/pulse2pulse_mimic.yaml`. See
     [Pulse2Pulse Training](../training/pulse2pulse_training.md).
 
 ## Training objective (WGAN-GP)
 
 `Pulse2PulseGAN` sets `automatic_optimization = False` and runs a manual loop in
-`training_step`. Each batch is a dict containing `batch["ecg_signals"]` of shape
-`(B, num_channels, seq_length)`.
+`training_step`. It reads the real ECGs with `get_signal(batch)` (an `ECGBatch`'s `signal`, or the
+legacy `batch["ecg_signals"]`), of shape `(B, num_channels, seq_length)`.
 
 For **every batch**, it updates the critic:
 
@@ -208,13 +195,13 @@ Both optimizers are `torch.optim.Adam(lr=config.lr, betas=(config.b1, config.b2)
 | `val/d_wasserstein` | epoch (prog bar) | Wasserstein estimate on validation batches |
 | `val_loss` | epoch (prog bar) | `-val/d_wasserstein` |
 
-The checkpoint callback in the train script monitors `val/d_wasserstein` with `mode="max"`.
+`configs/experiments/pulse2pulse_mimic.yaml` checkpoints on `val/d_wasserstein` with `mode: max`.
 
 `validation_step` also stores the first real and generated sample of batch 0 in
 `_val_real_sample` / `_val_fake_sample`. `ECGVisualizationCallback` reads these
 (see [Callbacks](../training/callbacks.md)).
 
-### Loss helpers in `training/losses/gan_losses.py`
+### Loss helpers in `src/ecgen/families/gan/losses.py`
 
 The Lightning module computes its losses inline and does **not** import this module. The
 helpers are equivalent, standalone functions:
@@ -237,7 +224,7 @@ fake_data, lmbda=10.0)`, and the Wasserstein estimate as
 
 ```python
 import torch
-from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
+from ecgen.families.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
 
 model = Pulse2PulseGAN(Pulse2PulseConfig())
 samples = model.generate_samples(n_samples=16)   # (16, 8, 5000), values in [-1, 1]
@@ -256,7 +243,7 @@ and samples noise on the generator's device.
 A plain `load_from_checkpoint` restores the model:
 
 ```python
-from models.gan.pulse2pulse import Pulse2PulseGAN
+from ecgen.families.gan.pulse2pulse import Pulse2PulseGAN
 
 model = Pulse2PulseGAN.load_from_checkpoint(
     "runs/pulse2pulse_mimic/seed_42/checkpoints/last.ckpt",
@@ -279,7 +266,7 @@ not needed. `scripts/generate/generate_pulse2pulse.py` uses this call.
   not in the optimizer. Its parameters stay at their random Kaiming initialisation (verified:
   `fc1.weight` is not in `opt_d.param_groups`).
 - **Output range vs. data scaling.** The generator ends in `tanh` (range `[-1, 1]`), but
-  `MIMICIVECGDataset` z-score normalises each record (zero mean, unit std), so real ECGs
+  `MIMICIVECG` (with the default `scale: zscore`) z-score normalises each record (zero mean, unit std), so real ECGs
   regularly exceed ±1.
 - **`n_critic` is based on `batch_idx`.** If an epoch has fewer than `n_critic` batches
   (for example, with a tiny `max_samples`), the generator is never updated. The epoch mean of
@@ -287,7 +274,7 @@ not needed. `scripts/generate/generate_pulse2pulse.py` uses this call.
 
 ## See also
 
-- [Pulse2Pulse Training](../training/pulse2pulse_training.md): train and generate scripts
+- [Pulse2Pulse Training](../training/pulse2pulse_training.md): training config and generate script
 - [Architecture Overview](architecture.md)
 - [Evaluation Metrics](../evaluation/metrics.md)
 - API reference: [Models](../api/models.md), [Training](../api/training.md)

@@ -1,7 +1,7 @@
 # VAE
 
 A 1-D convolutional variational autoencoder for multi-lead ECG, in
-[`models/vae/`](https://github.com/vlbthambawita/ECGEN/tree/main/models/vae).
+[`src/ecgen/families/vae/`](https://github.com/vlbthambawita/ECGEN/tree/main/src/ecgen/families/vae).
 
 !!! tip "Visual guide"
     For animated diagrams of the input, architecture, output and loss, see the
@@ -9,20 +9,20 @@ A 1-D convolutional variational autoencoder for multi-lead ECG, in
 
 | Class | File | Role |
 |-------|------|------|
-| `VAEConfig` | `models/vae/config.py` | Dataclass of architecture + optimiser settings |
-| `VAE1D` | `models/vae/vae_1d.py` | `nn.Module`: `Encoder1D` → reparameterisation → `Decoder1D` |
-| `VAELightning` | `models/vae/vae_lightning.py` | LightningModule: loss, logging, Adam, `reconstruct()`, `sample()` |
-| `vae_loss` | `training/losses/vae_losses.py` | MSE + weighted KL |
+| `VAEConfig` | `src/ecgen/families/vae/config.py` | Dataclass of architecture + optimiser settings |
+| `VAE1D` | `src/ecgen/families/vae/vae_1d.py` | `nn.Module`: `Encoder1D` → reparameterisation → `Decoder1D` |
+| `VAELightning` | `src/ecgen/families/vae/vae_lightning.py` | LightningModule: loss, logging, Adam, `reconstruct()`, `sample()` |
+| `vae_loss` | `src/ecgen/families/vae/losses.py` | MSE + weighted KL |
 
 ```python
-from models.vae import VAE1D, VAELightning, VAEConfig
-from training.losses import vae_loss
+from ecgen.families.vae import VAE1D, VAELightning, VAEConfig
+from ecgen.families.vae.losses import vae_loss
 ```
 
 ## Architecture
 
-`VAE1D` is built from the shared blocks in `models/components/` (see
-[Architecture overview](architecture.md#shared-components-modelscomponents)):
+`VAE1D` is built from the shared blocks in `src/ecgen/nn/` (see
+[Architecture overview](architecture.md#shared-components-srcecgennn)):
 
 - **Encoder** (`Encoder1D`): `Conv1d(k=7)` → per stage, `num_res_blocks` × `ResidualBlock1D`
   (GroupNorm + SiLU, residual shortcut) with a stride-2 `Conv1d(k=4)` between stages → two middle
@@ -84,8 +84,8 @@ for the quality of `sample()`.
 
 ```python
 import torch
-from models.vae import VAE1D
-from training.losses import vae_loss
+from ecgen.families.vae import VAE1D
+from ecgen.families.vae.losses import vae_loss
 
 model = VAE1D(in_channels=12, base_channels=64, latent_channels=8,
               channel_multipliers=(1, 2, 4, 4), num_res_blocks=2)
@@ -102,7 +102,7 @@ Other `VAE1D` methods: `encode(x) -> (mean, logvar)`, `reparameterize(mean, logv
 ### Lightning module
 
 ```python
-from models.vae import VAELightning, VAEConfig
+from ecgen.families.vae import VAELightning, VAEConfig
 
 model = VAELightning(VAEConfig(latent_channels=8, kl_weight=1e-4))
 # or: VAELightning({"latent_channels": 8, "kl_weight": 1e-4})
@@ -115,22 +115,21 @@ Logged metrics: `train/total_loss`, `train/recon_loss`, `train/kl_loss` (step + 
 `val/total_loss`, `val/recon_loss`, `val/kl_loss`, and `val_loss` (used for checkpointing / early
 stopping). The optimiser is a single Adam with no LR scheduler.
 
-!!! warning "Batch format"
-    `VAELightning.training_step` reads `batch["ecg_signals"]` (dict batches, as described by
-    `BaseECGDataset`). `MIMICIVECGDataset` returns `(ecg, features)` tuples, so `VAELightning`
-    cannot be trained on it directly. `scripts/train/train_vae_mimic.py` therefore trains its own
-    `VAEDataWrapper` module, which unpacks tuples but is otherwise equivalent (same `vae.*` weights,
-    same logged metrics). See [VAE training](../training/vae_training.md).
+!!! note "Batch format"
+    `VAELightning` reads the signal with `get_signal(batch)`, so it trains on the `ECGBatch` objects
+    produced by `ECGDataModule` and also accepts legacy `{"ecg_signals": ...}` dicts and
+    `(ecg, features)` tuples. Train it with `ecgen train configs/experiments/vae_mimic.yaml`; see
+    [VAE training](../training/vae_training.md).
 
 ### Loading a checkpoint
 
-Checkpoints from both `VAELightning` and the script's `VAEDataWrapper` store the flattened
-`VAEConfig` fields as hyper-parameters and the weights under `vae.*`, so they can be loaded into
-`VAELightning`. The constructor accepts either `config=` or the flat config fields as keyword
+Checkpoints from `VAELightning` (and from the removed `train_vae_mimic.py` script's
+`VAEDataWrapper`) store the flattened `VAEConfig` fields as hyper-parameters and the weights under
+`vae.*`, so they can be loaded into `VAELightning`. The constructor accepts either `config=` or the flat config fields as keyword
 arguments, so a plain `load_from_checkpoint` works:
 
 ```python
-from models.vae import VAELightning
+from ecgen.families.vae import VAELightning
 
 model = VAELightning.load_from_checkpoint("runs/vae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu")
 model.eval()

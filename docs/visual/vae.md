@@ -2,7 +2,7 @@
 
 `VAE1D` compresses a 12-lead ECG into a short **sequence** of Gaussian latent vectors and
 reconstructs it. After training, decoding random draws from N(0, I) generates new ECGs.
-Code: `models/vae/`, loss: `training/losses/vae_losses.py`. Written reference: [VAE](../models/vae.md).
+Code: `src/ecgen/families/vae/`, loss: `src/ecgen/families/vae/losses.py`. Written reference: [VAE](../models/vae.md).
 
 ## Forward pass during training
 

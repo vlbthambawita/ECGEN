@@ -16,7 +16,12 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "wfdb",
+    "matplotlib",   # training visualization callbacks
+    "tensorboard",  # default training logger
 ]
+
+[project.scripts]
+ecgen = "ecgen.cli:main"
 
 [project.optional-dependencies]
 hf = ["huggingface_hub>=0.20", "python-dotenv>=1.0"]

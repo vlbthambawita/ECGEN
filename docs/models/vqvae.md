@@ -15,10 +15,10 @@ ECGEN's VQ-VAE is a two-stage generative model for 12-lead ECGs:
 To generate, the prior samples a sequence of code indices and the VQ-VAE decoder turns
 it into an ECG.
 
-All classes live in `models/vqvae/` and are exported from `models.vqvae`:
+All classes live in `src/ecgen/families/vqvae/` and are exported from `ecgen.families.vqvae`:
 
 ```python
-from models.vqvae import (
+from ecgen.families.vqvae import (
     VQVAEConfig, PriorConfig,            # dataclass configs
     VQVAE1D, VectorQuantizer,            # plain nn.Modules (stage 1)
     PixelCNNPrior, CausalGatedBlock,     # plain nn.Modules (stage 2)
@@ -43,10 +43,10 @@ flowchart LR
 
 ### Encoder and decoder
 
-`VQVAE1D` reuses the shared `Encoder1D` / `Decoder1D` from `models/components/`, the same
+`VQVAE1D` reuses the shared `Encoder1D` / `Decoder1D` from `src/ecgen/nn/`, the same
 blocks that the [VAE](vae.md) uses:
 
-- **`ResidualBlock1D`** (`models/components/blocks.py`): two `Conv1d(k=3)` → `GroupNorm(8)` → SiLU
+- **`ResidualBlock1D`** (`src/ecgen/nn/blocks.py`): two `Conv1d(k=3)` → `GroupNorm(8)` → SiLU
   layers with a residual shortcut (a 1×1 conv when the channel count changes).
 - **`Encoder1D`**: `Conv1d(k=7)` stem, then for each entry in `channel_multipliers`, `num_res_blocks`
   residual blocks at `base_channels * mult` channels. A stride-2 `Conv1d(k=4)` follows every
@@ -62,7 +62,7 @@ blocks that the [VAE](vae.md) uses:
 
 ### Vector quantizer
 
-`VectorQuantizer(num_embeddings, embedding_dim, commitment_cost)` (`models/vqvae/vector_quantizer.py`)
+`VectorQuantizer(num_embeddings, embedding_dim, commitment_cost)` (`src/ecgen/families/vqvae/vector_quantizer.py`)
 works as follows:
 
 - It holds an `nn.Embedding(num_embeddings, embedding_dim)` codebook, initialised uniformly in
@@ -82,7 +82,7 @@ works as follows:
 ### PixelCNN prior
 
 `PixelCNNPrior(num_embeddings=512, hidden_dim=128, num_layers=10, kernel_size=2, dilation_cycle=10)`
-(`models/vqvae/pixelcnn_prior.py`) is a WaveNet-style stack of causal dilated convolutions. It
+(`src/ecgen/families/vqvae/pixelcnn_prior.py`) is a WaveNet-style stack of causal dilated convolutions. It
 has these parts:
 
 - `nn.Embedding(num_embeddings, hidden_dim)` turns code indices into vectors.
@@ -140,7 +140,7 @@ has about 1.14 M (1,136,256).
 
 ## Configuration
 
-Both configs are dataclasses in `models/vqvae/config.py`. The Lightning wrappers accept the
+Both configs are dataclasses in `src/ecgen/families/vqvae/config.py`. The Lightning wrappers accept the
 dataclass, a plain `dict` (converted with `Config(**dict)`), or the fields as flat keyword
 arguments (`VQVAELightning(num_embeddings=256)`), which is what `load_from_checkpoint` uses.
 
@@ -180,7 +180,7 @@ for how the experiment YAMLs are wired.
 
 ## Losses
 
-Both losses live in `training/losses/vqvae_losses.py`.
+Both losses live in `src/ecgen/families/vqvae/losses.py`.
 
 | Function | Signature | Computes |
 |---|---|---|
@@ -194,13 +194,13 @@ no extra weight on it.
 
 ### `VQVAELightning` (stage 1)
 
-`models/vqvae/vqvae_lightning.py`. Constructed as `VQVAELightning(config)` and wraps a
+`src/ecgen/families/vqvae/vqvae_lightning.py`. Constructed as `VQVAELightning(config)` and wraps a
 `VQVAE1D` in `self.vqvae`.
 
 | Method | Description |
 |---|---|
 | `forward(x)` | Returns `(recon, vq_loss, indices)` |
-| `training_step` / `validation_step` | Accept a `(ecg, features)` tuple (the MIMIC dataset format) or a dict with key `"ecg_signals"` |
+| `training_step` / `validation_step` | Read the signal with `get_signal(batch)`: an `ECGBatch` (from `ECGDataModule`), a `{"signal"}` or legacy `{"ecg_signals"}` dict, or an `(ecg, features)` tuple |
 | `reconstruct(x)` | `no_grad`. Returns the reconstruction `[B, C, L]` |
 | `encode_to_indices(x)` | `no_grad`. Returns code indices `[B, L_latent]`. The prior uses this |
 | `decode_from_indices(indices)` | `no_grad`. Returns an ECG `[B, C, L_latent * factor]` |
@@ -226,7 +226,7 @@ Logged metrics:
 
 ### `PriorLightning` (stage 2)
 
-`models/vqvae/prior_lightning.py`. Constructed as `PriorLightning(config)` and wraps a
+`src/ecgen/families/vqvae/prior_lightning.py`. Constructed as `PriorLightning(config)` and wraps a
 `PixelCNNPrior` in `self.prior`. The frozen VQ-VAE in `self.vqvae` is set up in one of two ways:
 
 - If `config.vqvae_config` is set (the case when restoring a prior checkpoint), `__init__` builds
@@ -264,7 +264,7 @@ how `save_hyperparameters(config.__dict__)` stores them. A plain `load_from_chec
 therefore works, for checkpoints written before and after this was fixed:
 
 ```python
-from models.vqvae import VQVAELightning, PriorLightning
+from ecgen.families.vqvae import VQVAELightning, PriorLightning
 
 vqvae = VQVAELightning.load_from_checkpoint(
     "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu"
@@ -290,7 +290,7 @@ prior = PriorLightning.load_from_checkpoint(
 
 ```python
 import torch
-from models.vqvae import VQVAELightning
+from ecgen.families.vqvae import VQVAELightning
 
 vqvae = VQVAELightning.load_from_checkpoint(
     "runs/vqvae_mimic/seed_42/checkpoints/last.ckpt", map_location="cpu"
@@ -306,7 +306,7 @@ x_hat = vqvae.decode_from_indices(indices)   # [4, 12, 5000]
 
 ```python
 import torch
-from models.vqvae import PriorLightning
+from ecgen.families.vqvae import PriorLightning
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 

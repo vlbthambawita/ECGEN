@@ -1,5 +1,5 @@
 """
-ECG generation models.
+Deprecated: use :mod:`ecgen.families`. Kept for backward compatibility.
 """
 
 from ecgen.models.pulse2pulse import (

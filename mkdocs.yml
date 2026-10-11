@@ -50,7 +50,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [.]
+          paths: [., src]
           options:
             docstring_style: google
             show_source: true
@@ -126,12 +126,13 @@ nav:
       - VQ-VAE + Prior: visual/vqvae.md
       - Pulse2Pulse GAN: visual/pulse2pulse.md
   - Training:
+      - Training with ecgen train: training/runner.md
       - Training Guide: training/guide.md
       - VAE Training: training/vae_training.md
       - VQ-VAE Training: training/vqvae_training.md
       - Pulse2Pulse Training: training/pulse2pulse_training.md
       - Callbacks: training/callbacks.md
-      - Training Scripts: training/scripts_comparison.md
+      - Training Entry Points: training/scripts_comparison.md
   - Evaluation & Visualization:
       - Evaluation Metrics: evaluation/metrics.md
       - Visualization: visualization/guide.md

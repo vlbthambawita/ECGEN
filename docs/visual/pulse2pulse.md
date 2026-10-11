@@ -2,7 +2,7 @@
 
 Pulse2Pulse is a WaveGAN-style GAN. It turns noise **with the same shape as an ECG** into an ECG,
 using a 1-D U-Net generator. A large convolutional critic scores real and generated ECGs, and
-training uses the WGAN-GP objective. Code: `models/gan/pulse2pulse.py`.
+training uses the WGAN-GP objective. Code: `src/ecgen/families/gan/pulse2pulse.py`.
 Written reference: [Pulse2Pulse GAN](../models/gan.md).
 
 ## Adversarial setup

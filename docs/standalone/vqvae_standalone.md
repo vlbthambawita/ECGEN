@@ -10,7 +10,7 @@
 | `README.md`, `QUICK_START.md`, `SUMMARY.md`, `FIXES.md`, `WANDB_GUIDE.md` | Older notes that this page replaces. Parts of them are out of date (see [Corrections](#corrections-to-the-older-notes)). |
 
 !!! warning "Independent copy: changes do not propagate"
-    The standalone file imports nothing from `models/`, `data/`, `training/` or `utils/`. It **re-implements** the same architecture as the packaged [VQ-VAE](../models/vqvae.md) (`models/vqvae/`). A fix or change in one is **not** reflected in the other. Checkpoints are also not interchangeable without care, because the module class paths differ. See [Differences from the packaged implementation](#differences-from-the-packaged-implementation).
+    The standalone file imports nothing from the `ecgen` package or the root `models/`, `data/`, `training/` or `utils/` packages. It **re-implements** the same architecture as the packaged [VQ-VAE](../models/vqvae.md) (`ecgen.families.vqvae`). A fix or change in one is **not** reflected in the other. Checkpoints are also not interchangeable without care, because the module class paths differ. See [Differences from the packaged implementation](#differences-from-the-packaged-implementation).
 
 ## Requirements
 
@@ -225,9 +225,9 @@ python train_vqvae_standalone.py --stage 2 \
 
 ### Data
 
-The standalone file has its own `MIMICIVECGDataset`, similar to but **not identical to** the packaged [`data.datasets.mimic.MIMICIVECGDataset`](../datasets/mimic.md):
+The standalone file has its own `MIMICIVECGDataset`, similar to but **not identical to** the packaged [`ecgen.data.datasets.MIMICIVECG`](../datasets/mimic.md):
 
-- Splits by `subject_id` with two seeded `train_test_split` calls (test first, then val from the remainder). This gives the same subject sets as the packaged dataset only when the input rows are identical, and they are not, because the packaged dataset drops NaN feature rows before splitting.
+- Splits by `subject_id` with two seeded `train_test_split` calls (test first, then val from the remainder). This gives the same subject sets as the packaged dataset only when the input rows are identical, and they are not, because the packaged dataset drops NaN feature rows before splitting (its default `missing: drop`).
 - **Does not** drop rows with NaN measurements. Feature statistics use `nanmean`/`nanstd`.
 - The missing-file check requires both `.hea` **and** `.dat`, and prints how many it found. If the split is empty after filtering and `max_samples`, the constructor raises `ValueError: Dataset is empty after filtering!` with hints.
 - If a record fails to load, it prints the error and returns an **all-zero** ECG instead of raising.
@@ -355,17 +355,17 @@ torch.save(samples.cpu(), "generated_ecgs.pt")
 
 ## Differences from the packaged implementation
 
-| Aspect | `single_file/` | Packaged (`models/vqvae/`, `scripts/train/train_vqvae_mimic.py`, `train_prior_mimic.py`) |
+| Aspect | `single_file/` | Packaged (`ecgen.families.vqvae` + `ecgen train`) |
 |--------|----------------|------------------------------------------------------------|
-| Code location | One file, no repo imports | `models.vqvae`, `data.datasets.mimic`, `training.callbacks`, `utils.seed` |
+| Code location | One file, no repo imports | `ecgen.families.vqvae`, `ecgen.data.datasets.MIMICIVECG`, `ecgen.training` |
 | Installation | none (plain `pip` deps) | `pip install -e .` |
-| Configuration | CLI flags / env vars only | `--config configs/experiments/{vqvae,prior}_mimic.yaml` plus CLI flags |
-| Entry point | one script with `--stage 1` or `--stage 2`; `run_train_vqvae.sh` with `1`, `2` or `both` | separate scripts per stage; `scripts/shell/run_train_vqvae_mimic.sh`, `run_train_vqvae_prior_mimic.sh` |
-| Dataset | own copy (keeps NaN-feature rows, zero ECG on read errors, no lead padding, train/val only) | `MIMICIVECGDataset` (drops NaN-feature rows, raises on read errors, pads leads, train/val/test) |
-| Batch format | tuple only | VQ-VAE/prior accept tuple **or** `{"ecg_signals": ...}` |
-| Visualization | minimal built-in callback (1 example, PNG only) | `training.callbacks.visualization.VAEVisualizationCallback` (`num_samples`, overlay/all-leads, TensorBoard/W&B logging) |
+| Configuration | CLI flags / env vars only | `configs/experiments/{vqvae,prior}_mimic.yaml` plus `key=value` overrides |
+| Entry point | one script with `--stage 1` or `--stage 2`; `run_train_vqvae.sh` with `1`, `2` or `both` | `ecgen train <config>` per stage; `scripts/shell/run_train_vqvae_mimic.sh`, `run_train_vqvae_prior_mimic.sh` |
+| Dataset | own copy (keeps NaN-feature rows, zero ECG on read errors, no lead padding, train/val only) | `MIMICIVECG` (drops NaN-feature rows by default, raises on read errors, pads or selects leads, train/val/test) |
+| Batch format | tuple only | `ECGBatch` from `ECGDataModule`; the wrappers also accept legacy tuples and dicts |
+| Visualization | minimal built-in callback (1 example, PNG only) | `vae_visualization` callback (`VAEVisualizationCallback`: `num_samples`, overlay/all-leads, TensorBoard/W&B logging) |
 | Resume | not supported | `--resume <ckpt>` |
-| W&B | stage 1 logger not attached (bug) | attached via `logger=loggers_list` |
+| W&B | stage 1 logger not attached (bug) | attached by the runner when `wandb.enabled` |
 | Default run names | `vqvae_mimic_standalone`, `prior_mimic_standalone` (wrapper) | `vqvae_mimic`, `prior_mimic` |
 | Shared behaviour | same architecture, defaults, metric names, checkpoint naming, config-from-hyperparameters checkpoint loading (self-contained prior checkpoints), and sampling via `VQVAELightning.latent_length()` | |
 
@@ -382,7 +382,7 @@ The `nn.Module` attribute names match (`vqvae.encoder`, `vqvae.vq`, `vqvae.decod
 | CUDA out of memory | Lower `BATCH_SIZE`, or `BASE_CHANNELS`/`LATENT_CHANNELS`. |
 | Low `codebook_usage` | Try a smaller `NUM_EMBEDDINGS`. Note the [β convention](#stage-1-vq-vae) before tuning `COMMITMENT_COST`. |
 | Slow start on the full dataset | The file-existence scan touches every record. Use `--skip-missing-check` once the data is known to be complete. |
-| `unrecognized arguments: --resume` | Not supported here. Use the packaged scripts. |
+| `unrecognized arguments: --resume` | Not supported here. Use `ecgen train ... --resume <ckpt>`. |
 
 ## Corrections to the older notes
 

@@ -26,18 +26,20 @@ experiment:
   runs_root: runs
 
 model:
+  name: vae
   params:
-    config:
-      in_channels: 12
-      base_channels: 64
-      latent_channels: 8
-      kl_weight: 0.0001
+    in_channels: 12
+    base_channels: 64
+    latent_channels: 8
+    kl_weight: 0.0001
 
 data:
-  params:
-    mimic_path: /path/to/mimic-iv-ecg
-    batch_size: 32
-    max_samples: 1000      # null for the full dataset
+  dataset:
+    name: mimic_iv_ecg
+    params:
+      root: /path/to/mimic-iv-ecg
+      max_samples: 1000      # null for the full dataset
+  batch_size: 32
 
 trainer:
   max_epochs: 100
@@ -45,38 +47,46 @@ trainer:
   devices: [0]
 ```
 
-Only specific keys are read by each script; see [Configuration](../getting_started/configuration.md).
+Every section is read by the same runner; see [Training with `ecgen train`](runner.md) for the full
+schema and [Configuration](../getting_started/configuration.md) for the per-family `params`.
 
 ### 3. Train
 
 ```bash
-./scripts/shell/run_train_vae_mimic_config.sh configs/experiments/my_vae.yaml
-./scripts/shell/run_train_vqvae_mimic.sh                       # VQ-VAE stage 1
-./scripts/shell/run_train_vqvae_prior_mimic.sh <vqvae.ckpt>    # VQ-VAE stage 2
+ecgen train configs/experiments/my_vae.yaml
+ecgen train configs/experiments/my_vae.yaml trainer.max_epochs=5     # overrides win over the YAML
+ecgen train configs/experiments/vqvae_mimic.yaml                     # VQ-VAE stage 1
+ecgen train configs/experiments/prior_mimic.yaml model.params.vqvae_checkpoint=<vqvae.ckpt>   # stage 2
 ```
 
-See [Training scripts compared](scripts_comparison.md) for every entry point.
+The `scripts/shell/run_train_*.sh` wrappers call the same command; see
+[Training entry points](scripts_comparison.md).
 
 ## Training components
 
-### Callbacks — `training/callbacks/`
+### Callbacks — `ecgen.training.callbacks`
 
 - `visualization.py`: `VAEVisualizationCallback`, `ECGVisualizationCallback`,
   `GeneratedSamplesCallback`
 - `checkpointing.py`, `logging.py`: empty placeholder classes (`CustomCheckpointCallback`,
   `CustomLoggingCallback`)
 
-Checkpointing, early stopping and LR monitoring use the stock Lightning callbacks. See
+The runner always adds a `ModelCheckpoint` built from the `checkpoint:` section; the other callbacks,
+including Lightning's `early_stopping` and `lr_monitor`, are listed by name in `callbacks:`. See
 [Callbacks](callbacks.md).
 
-### Losses — `training/losses/`
+### Losses
 
-| File | Functions |
+Each family keeps its loss next to its model:
+
+| Module | Functions |
 |------|-----------|
-| `vae_losses.py` | `vae_loss` |
-| `vqvae_losses.py` | `vqvae_loss`, `prior_loss` |
-| `gan_losses.py` | `wgan_discriminator_loss`, `wgan_generator_loss`, `adversarial_loss`, `least_squares_discriminator_loss`, `least_squares_generator_loss` |
-| `common.py` | `mse_loss`, `l1_loss` |
+| `ecgen.families.vae.losses` | `vae_loss` |
+| `ecgen.families.vqvae.losses` | `vqvae_loss`, `prior_loss` |
+| `ecgen.families.gan.losses` | `wgan_discriminator_loss`, `wgan_generator_loss`, `adversarial_loss`, `least_squares_discriminator_loss`, `least_squares_generator_loss` |
+| `training/losses/common.py` | `mse_loss`, `l1_loss` |
+
+The old `training/losses/{vae,vqvae,gan}_losses.py` modules re-export these for one release.
 
 ### Metrics — `training/metrics/`
 
@@ -91,16 +101,14 @@ Evaluation metrics for generated samples live in the separate `evaluation/` pack
 
 ### Trainers — `training/trainers/`
 
-- `gan_trainer.py`: a generic config-driven trainer (`--config`) that instantiates `target` classes
-  from the YAML and writes `config_resolved.yaml` / `metadata.json`. It imports the legacy
-  `ecgen.utils` modules.
+- `gan_trainer.py`: deprecated; forwards `--config <yaml>` to the runner (`ecgen.training.train`).
 - `base_trainer.py`, `vae_trainer.py`: placeholder classes.
 
 ## Monitoring
 
 ### TensorBoard
 
-Every script logs to `runs/<exp_name>/seed_<seed>/tb/`:
+Every run logs to `runs/<exp_name>/seed_<seed>/tb/`:
 
 ```bash
 tensorboard --logdir runs/                          # all runs
@@ -109,7 +117,7 @@ tensorboard --logdir runs/vae_mimic/seed_42/tb      # one run
 
 ### Weights & Biases
 
-Enable it in the experiment YAML (the scripts create the `WandbLogger` for you):
+Enable it in the experiment YAML (the runner creates the `WandbLogger` for you):
 
 ```yaml
 wandb:
@@ -120,21 +128,26 @@ wandb:
   tags: [vae]
 ```
 
-or with `--wandb --wandb-project <name>` when running without a config.
+or on the command line with `wandb.enabled=true wandb.project=<name>`.
 
 ## Reproducibility
 
-The scripts call `utils.seed.set_global_seed(seed)` and build the `Trainer` with
-`deterministic=True`. The dataset split is seeded by the same `seed` and is done at the subject level.
+The runner calls `ecgen.utils.seed.set_global_seed(experiment.seed)`; the shipped configs also set
+`trainer.deterministic: true`. The MIMIC-IV-ECG split is done at the subject level and seeded by the
+dataset's own `seed` parameter (default 42). Each run writes `config_resolved.yaml` and
+`metadata.json` (command, package versions, git info) next to its checkpoints.
 
 ## Practical advice
 
-1. **Start small**: set `data.params.max_samples` (e.g. 1000) and a few epochs to check the pipeline.
+1. **Start small**: set `data.dataset.params.max_samples=1000` and a few epochs to check the
+   pipeline, or use `data.dataset.name=synthetic` with no data at all
+   (see [Smoke runs](runner.md#smoke-runs-without-data)).
 2. **Watch the plots**: the reconstruction images in `samples/` reveal problems before the loss does.
 3. **Mind `check_val_every_n_epoch`**: checkpointing, early stopping and visualization all run
    after validation. Validation runs on 0-based epochs 4, 9, 14, ... when it is set to 5; with
-   `visualization.every_n_epochs: 5` as well (the `vae_mimic.yaml` defaults) no reconstruction plot
-   is ever produced — see [Visualization](../visualization/guide.md#reconstruction-plots-during-training).
+   `log_every_n_epochs: 5` on `vae_visualization` as well (the `vae_mimic.yaml` defaults) no
+   reconstruction plot is ever produced — see
+   [Visualization](../visualization/guide.md#reconstruction-plots-during-training).
 
 ## Troubleshooting
 
@@ -144,4 +157,4 @@ The scripts call `utils.seed.set_global_seed(seed)` and build the `Trainer` with
 
 ### Slow training
 - Increase `num_workers`
-- Use `skip_missing_check: true` once the dataset is known to be complete
+- Use `data.dataset.params.skip_missing_check: true` once the dataset is known to be complete

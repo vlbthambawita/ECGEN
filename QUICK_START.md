@@ -36,7 +36,7 @@ Expected output: `✅ All imports successful!`
 This will:
 - Load config from `configs/experiments/vae_mimic.yaml`
 - Train VAE on MIMIC-IV-ECG dataset
-- Save outputs to `outputs/vae_mimic/`
+- Save outputs to `runs/vae_mimic/seed_42/`
 
 ### Option B: Train Pulse2Pulse GAN
 
@@ -49,7 +49,7 @@ This will:
 ### TensorBoard
 
 ```bash
-tensorboard --logdir outputs/vae_mimic/
+tensorboard --logdir runs/vae_mimic/
 ```
 
 Then open http://localhost:6006
@@ -57,7 +57,7 @@ Then open http://localhost:6006
 ### Check Outputs
 
 ```bash
-ls -la outputs/vae_mimic/seed_42/
+ls -la runs/vae_mimic/seed_42/
 ```
 
 You'll see:
@@ -70,11 +70,11 @@ You'll see:
 After training completes:
 
 ```python
-from models.vae import VAELightning
+from ecgen.families.vae import VAELightning
 
 # Load trained model
 model = VAELightning.load_from_checkpoint(
-    "outputs/vae_mimic/seed_42/checkpoints/best.ckpt"
+    "runs/vae_mimic/seed_42/checkpoints/last.ckpt"
 )
 
 # Generate samples
@@ -153,7 +153,7 @@ dataset:
 ## Getting Help
 
 1. Check documentation in `docs/`
-2. Review examples in `scripts/train/`
+2. Review the experiment configs in `configs/experiments/` (train any of them with `ecgen train <config>`)
 3. See [REORGANIZATION_COMPLETE.md](REORGANIZATION_COMPLETE.md) for what changed
 
 Happy training! 🚀

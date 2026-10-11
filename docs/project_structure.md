@@ -1,58 +1,56 @@
 # Project Structure
 
-ECGEN is installed as the `ecgen` distribution (`pip install -e .`), which provides six **top-level**
-packages: `models`, `data`, `training`, `evaluation`, `utils`, `visualization`. A legacy package under
-`src/ecgen/` still exists and is used by a few scripts (see [below](#legacy-srcecgen)).
+`pip install -e .` installs one package, **`ecgen`** (`src/ecgen/`), plus the `ecgen` command. It
+holds the model families, datasets, the training runner and the published generation/plotting
+helpers. The research packages at the repository root (`models`, `data`, `training`, `evaluation`,
+`utils`, `visualization`) are **not** installed; run code that uses them from the repo root. Several
+of their modules are now one-line re-export shims of `ecgen` modules (see
+[below](#compatibility-shims)).
 
 ## Directory layout
 
 ```
 ECGEN/
-├── models/                         # Model architectures
-│   ├── components/                 # Shared blocks
-│   │   ├── blocks.py               #   ResidualBlock1D
-│   │   ├── encoders.py             #   Encoder1D
-│   │   └── decoders.py             #   Decoder1D
-│   ├── vae/                        # VAE
-│   │   ├── config.py               #   VAEConfig
-│   │   ├── vae_1d.py               #   VAE1D
-│   │   └── vae_lightning.py        #   VAELightning
-│   ├── vqvae/                      # VQ-VAE + PixelCNN prior
-│   │   ├── config.py               #   VQVAEConfig, PriorConfig
-│   │   ├── vector_quantizer.py     #   VectorQuantizer
-│   │   ├── vqvae_1d.py             #   VQVAE1D
-│   │   ├── vqvae_lightning.py      #   VQVAELightning (stage 1)
-│   │   ├── pixelcnn_prior.py       #   CausalGatedBlock, PixelCNNPrior
-│   │   └── prior_lightning.py      #   PriorLightning (stage 2)
-│   ├── gan/
-│   │   └── pulse2pulse.py          #   WaveGANGenerator, WaveGANDiscriminator, Pulse2PulseConfig, Pulse2PulseGAN
-│   ├── diffusion/                  # placeholder
-│   └── ssm/                        # placeholder
+├── src/ecgen/                      # the installed package
+│   ├── cli.py, __main__.py         # `ecgen train ...`, `ecgen list`, `python -m ecgen`
+│   ├── registry.py                 # Registry, FAMILIES, DATASETS, CALLBACKS, load_builtins
+│   ├── types.py                    # ECGBatch, ConditionOutput, get_signal
+│   ├── families/                   # one sub-package per model family
+│   │   ├── base.py                 #   GenerativeModule, Capabilities
+│   │   ├── vae/                    #   config.py, vae_1d.py, vae_lightning.py, losses.py
+│   │   ├── vqvae/                  #   config.py, vector_quantizer.py, vqvae_1d.py, vqvae_lightning.py,
+│   │   │                           #   pixelcnn_prior.py, prior_lightning.py, losses.py
+│   │   └── gan/                    #   pulse2pulse.py, losses.py
+│   ├── nn/                         # blocks.py (ResidualBlock1D), encoders.py, decoders.py
+│   ├── data/
+│   │   ├── datasets/               #   base.py (BaseECGDataset), mimic.py (MIMICIVECG), synthetic.py
+│   │   ├── datamodule.py           #   ECGDataModule (generic LightningDataModule)
+│   │   ├── collate.py              #   ECGCollate -> ECGBatch
+│   │   ├── leads.py                #   STANDARD_12, INDEPENDENT_8, resolve_leads
+│   │   ├── normalizers.py          #   FeatureNormalizer
+│   │   └── mimic_dataset.py, pulse2pulse_mimic.py   # legacy loaders (tuple / GAN datamodule)
+│   ├── training/
+│   │   ├── runner.py               #   YAML-driven training for every family
+│   │   ├── callbacks/              #   visualization.py, checkpointing.py, logging.py (placeholders)
+│   │   └── train.py                #   deprecated `--config` wrapper around the runner
+│   ├── utils/                      # config.py, seed.py, io.py, logging.py, metadata.py
+│   ├── generate.py, plot.py        # ecgen.generate, ecgen.plot_ecg
+│   ├── f/                          # Hugging Face upload helpers
+│   └── models/                     # deprecated shims to ecgen.families
 │
-├── data/
-│   └── datasets/
-│       ├── base.py                 # BaseECGDataset (abstract)
-│       └── mimic/
-│           ├── dataset.py          # MIMICIVECGDataset
-│           ├── datamodule.py       # ECGDataModule (minimal dataclass, not a LightningDataModule)
-│           └── pulse2pulse_datamodule.py   # imports the legacy ecgen dataset
-│
+├── models/                         # shims (vae/, vqvae/, gan/, components/); diffusion/, ssm/ placeholders
+├── data/datasets/                  # shims: base.py, mimic/dataset.py, mimic/pulse2pulse_datamodule.py
 ├── training/
-│   ├── callbacks/
-│   │   ├── visualization.py        # ECGVisualizationCallback, GeneratedSamplesCallback, VAEVisualizationCallback
-│   │   ├── checkpointing.py        # placeholder
-│   │   └── logging.py              # placeholder
-│   ├── losses/                     # vae_losses.py, vqvae_losses.py, gan_losses.py, common.py
+│   ├── callbacks/                  # shims to ecgen.training.callbacks
+│   ├── losses/                     # common.py; *_losses.py are shims to ecgen.families.*.losses
 │   ├── metrics/                    # reconstruction.py, generation.py, clinical.py
-│   └── trainers/                   # gan_trainer.py (generic config trainer), base/vae placeholders
-│
+│   └── trainers/                   # gan_trainer.py (deprecated wrapper), base/vae placeholders
 ├── evaluation/
 │   ├── metrics/                    # fidelity.py, diversity.py, signal_quality.py
 │   ├── benchmark.py                # ModelBenchmark
 │   └── visualize.py                # plot_evaluation_results, plot_comparison_matrix
-│
 ├── visualization/                  # ecg_plots.py, latent_space.py, training_curves.py
-├── utils/                          # seed.py, io.py, logging.py, metadata.py
+├── utils/                          # shims to ecgen.utils
 │
 ├── configs/
 │   ├── experiments/                # vae_mimic, vqvae_mimic, prior_mimic, pulse2pulse_mimic (.yaml)
@@ -61,16 +59,14 @@ ECGEN/
 │   └── training/                   # default.yaml (empty), fast_dev.yaml, production.yaml
 │
 ├── scripts/
-│   ├── train/                      # train_vae_mimic.py, train_vqvae_mimic.py, train_prior_mimic.py,
-│   │                               # train_pulse2pulse.py, train_template.py
-│   ├── shell/                      # run_train_*.sh wrappers, run_sweep.sh
+│   ├── train/                      # train_template.py (points at the runner)
+│   ├── shell/                      # run_train_*.sh wrappers around `python -m ecgen train`, run_sweep.sh
 │   ├── generate/                   # generate_pulse2pulse.py, generate_vae.py (stub)
 │   ├── evaluate/                   # evaluate_model.py, benchmark_models.py
 │   ├── data/                       # prepare_mimic.py, validate_dataset.py (stubs)
 │   └── utils/                      # test_models_only.py, test_pulse2pulse_setup.py
 │
 ├── single_file/                    # self-contained VQ-VAE: train_vqvae_standalone.py, run_train_vqvae.sh
-├── src/ecgen/                      # legacy package (not installed)
 ├── tests/                          # test_models/, test_data/, test_training/
 ├── docs/                           # this documentation (MkDocs)
 ├── runs/                           # training outputs (git-ignored)
@@ -79,60 +75,66 @@ ECGEN/
 
 ## Module responsibilities
 
-| Package | Contents |
+| Module | Contents |
 |---------|----------|
-| `models` | `nn.Module`s and their `LightningModule` wrappers; one sub-package per family. See [Architecture](models/architecture.md). |
-| `data` | Datasets. `MIMICIVECGDataset` reads WFDB records, does a seeded subject-level train/val/test split, and returns `(ecg, features)` where `ecg` is `(num_leads, seq_length)` (default 12 × 5000) and `features` are 9 normalised machine measurements. See [MIMIC-IV-ECG](datasets/mimic.md) and [Custom datasets](datasets/custom.md). |
-| `training` | Callbacks, losses, training-time metrics, trainers. See [Training guide](training/guide.md). |
+| `ecgen.families` | `nn.Module`s and their `GenerativeModule` (Lightning) wrappers, configs and losses; one sub-package per family. See [Architecture](models/architecture.md). |
+| `ecgen.data` | `BaseECGDataset` dict contract, `MIMICIVECG` and `SyntheticECG`, `ECGDataModule`, lead handling and normalizers. See [MIMIC-IV-ECG](datasets/mimic.md) and [Adding a dataset](datasets/custom.md). |
+| `ecgen.training` | The runner (`ecgen train`) and callbacks. See [Training with `ecgen train`](training/runner.md). |
+| `ecgen.registry` | Name → class registries used to build components from YAML. |
+| `training` (root) | Training-time metrics, `losses/common.py`, placeholder trainers. |
 | `evaluation` | Metrics and benchmarking for generated ECGs. See [Evaluation metrics](evaluation/metrics.md). |
 | `visualization` | Matplotlib helpers for ECGs, latents and curves. See [Visualization](visualization/guide.md). |
-| `utils` | `set_global_seed`, YAML/JSON I/O (`read_yaml`, `write_yaml`, `write_json`), `get_logger`, `collect_run_metadata`. |
+| `ecgen.utils` | `set_global_seed`, YAML/JSON I/O (`read_yaml`, `write_yaml`, `write_json`), `get_logger`, `collect_run_metadata`, `resolve_config`. |
 
 ## Import patterns
 
 ```python
-from models.vae import VAE1D, VAELightning, VAEConfig
-from models.vqvae import VQVAELightning, PriorLightning, VQVAEConfig, PriorConfig
-from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig   # models.gan exports nothing
-from models.components import ResidualBlock1D, Encoder1D, Decoder1D
+from ecgen.families.vae import VAE1D, VAELightning, VAEConfig, vae_loss
+from ecgen.families.vqvae import VQVAELightning, PriorLightning, VQVAEConfig, PriorConfig
+from ecgen.families.gan import Pulse2PulseGAN, Pulse2PulseConfig
+from ecgen.nn import ResidualBlock1D, Encoder1D, Decoder1D
 
-from data.datasets.mimic.dataset import MIMICIVECGDataset   # or: from data.datasets.mimic import MIMICIVECGDataset
-from data.datasets.base import BaseECGDataset
+from ecgen.data.datasets import BaseECGDataset, MIMICIVECG, SyntheticECG
+from ecgen.data.datamodule import ECGDataModule
+from ecgen.types import ECGBatch, get_signal
 
-from training.callbacks import VAEVisualizationCallback, ECGVisualizationCallback, GeneratedSamplesCallback
-from training.losses import vae_loss, vqvae_loss, prior_loss
+from ecgen.training.callbacks import VAEVisualizationCallback, ECGVisualizationCallback, GeneratedSamplesCallback
+from ecgen.training.runner import train_from_file
+from ecgen.registry import FAMILIES, DATASETS, CALLBACKS
+from ecgen.utils.seed import set_global_seed
 
-from visualization import plot_ecg_leads, plot_latent_space_2d
-from utils.seed import set_global_seed
+from visualization import plot_ecg_leads, plot_latent_space_2d   # from the repo root
 ```
 
-The old `ecgen.*` imports (`from ecgen.models.vae import ...`, `from ecgen.training.callbacks import ...`)
-refer to the legacy package. See
-[`MIGRATION_GUIDE.md`](https://github.com/vlbthambawita/ECGEN/blob/main/MIGRATION_GUIDE.md) for the
-old → new mapping.
+## Compatibility shims
 
-## Legacy `src/ecgen/`
+These old paths re-export the moved modules and will be removed after one release:
 
-`src/ecgen/` is not listed in `pyproject.toml`, so it is not installed, but these files still import
-it and need `PYTHONPATH=src`:
+| Old import | New import |
+|---|---|
+| `models.vae`, `models.vqvae` | `ecgen.families.vae`, `ecgen.families.vqvae` |
+| `models.gan.pulse2pulse`, `ecgen.models.pulse2pulse` | `ecgen.families.gan.pulse2pulse` |
+| `ecgen.models.vae` | `ecgen.families.vae` |
+| `models.components` | `ecgen.nn` |
+| `training.callbacks` | `ecgen.training.callbacks` |
+| `training.losses.{vae,vqvae,gan}_losses` | `ecgen.families.{vae,vqvae,gan}.losses` |
+| `utils.{config,io,logging,metadata,seed}` | `ecgen.utils.*` |
+| `data.datasets.base` | `ecgen.data.datasets.base` |
+| `data.datasets.mimic.dataset`, `data.datasets.mimic.pulse2pulse_datamodule` | legacy `ecgen.data.mimic_dataset`, `ecgen.data.pulse2pulse_mimic` |
 
-- `scripts/train/train_vae_mimic.py` (its `VAEDataWrapper`)
-- `scripts/train/train_pulse2pulse.py`
-- `scripts/utils/test_models_only.py`
-- `training/trainers/gan_trainer.py`
-- `data/datasets/mimic/pulse2pulse_datamodule.py`
-- `tests/test_models/test_vae.py`
-- the `target:` strings in `configs/experiments/vae_mimic.yaml` and `pulse2pulse_mimic.yaml`
+`training/trainers/gan_trainer.py` and `ecgen.training.train` are deprecated wrappers around the
+runner.
 
 ## Run outputs
 
 ```
 runs/<experiment.name>/seed_<seed>/
+├── config_resolved.yaml
+├── metadata.json
 ├── checkpoints/          # epochNNN-stepNNNNNN.ckpt + last.ckpt
-├── samples/              # visualization PNGs
-├── tb/                   # TensorBoard logs
-├── config_resolved.yaml  # gan_trainer.py only
-└── metadata.json         # gan_trainer.py only (also creates metrics/ and preds/)
+├── samples/              # visualization output
+├── metrics/              # train_val_metrics.json
+└── tb/                   # TensorBoard logs
 ```
 
 ## Quick reference
@@ -141,14 +143,14 @@ runs/<experiment.name>/seed_<seed>/
 
 | Component | Location |
 |-----------|----------|
-| Shared conv blocks | `models/components/` |
-| VAE | `models/vae/` |
-| VQ-VAE and prior | `models/vqvae/` |
-| Pulse2Pulse | `models/gan/pulse2pulse.py` |
-| MIMIC dataset | `data/datasets/mimic/dataset.py` |
-| Callbacks | `training/callbacks/visualization.py` |
-| Losses | `training/losses/` |
-| Training scripts | `scripts/train/` (wrappers in `scripts/shell/`) |
+| Training runner / CLI | `src/ecgen/training/runner.py`, `src/ecgen/cli.py` |
+| Shared conv blocks | `src/ecgen/nn/` |
+| VAE | `src/ecgen/families/vae/` |
+| VQ-VAE and prior | `src/ecgen/families/vqvae/` |
+| Pulse2Pulse | `src/ecgen/families/gan/pulse2pulse.py` |
+| MIMIC dataset | `src/ecgen/data/datasets/mimic.py` |
+| Callbacks | `src/ecgen/training/callbacks/visualization.py` |
+| Losses | `src/ecgen/families/*/losses.py` |
 | Experiment configs | `configs/experiments/` |
 | Standalone VQ-VAE | `single_file/` |
 
@@ -156,20 +158,24 @@ runs/<experiment.name>/seed_<seed>/
 
 | Task | Command |
 |------|---------|
-| Train the VAE | `./scripts/shell/run_train_vae_mimic_config.sh [config]` |
-| Train the VQ-VAE (stage 1) | `./scripts/shell/run_train_vqvae_mimic.sh [config]` |
-| Train the prior (stage 2) | `./scripts/shell/run_train_vqvae_prior_mimic.sh <vqvae.ckpt> [config]` |
-| Train Pulse2Pulse | `./scripts/shell/run_train_pulse2pulse_standalone.sh` (see [Pulse2Pulse training](training/pulse2pulse_training.md)) |
+| Train the VAE | `ecgen train configs/experiments/vae_mimic.yaml` |
+| Train the VQ-VAE (stage 1) | `ecgen train configs/experiments/vqvae_mimic.yaml` |
+| Train the prior (stage 2) | `ecgen train configs/experiments/prior_mimic.yaml model.params.vqvae_checkpoint=<vqvae.ckpt>` |
+| Train Pulse2Pulse | `ecgen train configs/experiments/pulse2pulse_mimic.yaml` |
+| Smoke-test without data | add `data.dataset.name=synthetic 'data.dataset.params={num_samples: 64}'` |
+| List registered components | `ecgen list` |
 | View TensorBoard | `tensorboard --logdir runs/<exp>/seed_<seed>/tb` |
 | Check reconstruction plots | `ls runs/<exp>/seed_<seed>/samples/` |
 | Run tests | `pytest tests/` |
 
 ## Adding new components
 
-- **Model**: new sub-package under `models/` (config dataclass + `nn.Module` + LightningModule),
-  exported from its `__init__.py`. See [Architecture](models/architecture.md#adding-a-new-model).
-- **Dataset**: subclass `BaseECGDataset` in `data/datasets/<name>/`. See
-  [Custom datasets](datasets/custom.md).
-- **Callback**: add it to `training/callbacks/` and export it from `training/callbacks/__init__.py`.
-- **Training script**: copy `scripts/train/train_template.py` or a `train_*_mimic.py` script, and add a
-  wrapper under `scripts/shell/` and a config under `configs/experiments/`.
+- **Model family**: new sub-package under `src/ecgen/families/` (config dataclass + `nn.Module` +
+  `GenerativeModule` wrapper + `losses.py`), registered with `@FAMILIES.register("<name>")`. See
+  [Architecture](models/architecture.md#adding-a-new-model).
+- **Dataset**: subclass `BaseECGDataset` and register it with `@DATASETS.register("<name>")`, or
+  reference it with `target:`. See [Adding a dataset](datasets/custom.md).
+- **Callback**: add it to `src/ecgen/training/callbacks/` and register a name in its `__init__.py`,
+  or reference it with `target:`. See [Callbacks](training/callbacks.md#custom-callbacks).
+- **Experiment**: a YAML under `configs/experiments/`; no training script is needed. See
+  [Training with `ecgen train`](training/runner.md).

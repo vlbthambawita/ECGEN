@@ -329,6 +329,25 @@ Each phase ends with green tests (`pytest tests/`), `black . && flake8 .`, a smo
 independently mergeable.
 
 ### Phase 0 — Foundations (no new models)
+
+> **Status: done** on branch `feat/phase0-foundations`.
+>
+> **Verification.** VAE, VQ-VAE and prior training through `ecgen train` reproduced the old
+> scripts' logged train and val metrics bit-for-bit (2 epochs on 256 MIMIC records, GPU,
+> deterministic).
+>
+> **Deviations from the steps below:**
+> - `GenerativeModule` only fixes the shared contract (`get_signal`, `sample`, `Capabilities`,
+>   registration). The shared `compute_loss`, EMA and `OptimConfig` from §4.4 are deferred to
+>   Phase 1 and Phase 3, where they are first needed. Each family keeps its existing training
+>   steps.
+> - Pulse2Pulse now trains on `leads: independent8` (I, II, V1–V6). This fixes a lead mismatch
+>   with `ecgen.generate`'s CSV columns: the old script fed I, II, III, aVR, aVF, aVL, V1, V2.
+>   The per-record z-score now runs over the selected leads, so its numbers intentionally differ
+>   from the old script.
+> - `missing: drop` stays the default. Switching to `mask` changes the subject split.
+> - Docs moved to the runner in this phase rather than waiting for Phase 8.
+
 1. Create `ecgen/types.py` (`ECGBatch`, `ConditionOutput`), `ecgen/registry.py`.
 2. Port `MIMICIVECGDataset` → `ecgen.data.datasets.mimic` returning **dicts**:
    - fit `FeatureNormalizer` on **train only** and share it with val/test;

@@ -1,79 +1,72 @@
+# VAE on MIMIC-IV-ECG.
+#   ecgen train configs/experiments/vae_mimic.yaml [key=value ...]
+#   e.g. ecgen train configs/experiments/vae_mimic.yaml data.dataset.params.max_samples=1000
+
 experiment:
   name: vae_mimic
   seed: 42
   runs_root: runs
 
 wandb:
-  enabled: true  # Set to true to enable Weights & Biases logging
+  enabled: true
   project: ecg-vae
-  entity: null  # Set to your wandb username/team or leave null for default
-  run_name: null  # Auto-generated if null
-  tags:
-    - vae
-    - ecg-generation
-    - mimic-iv-ecg
+  entity: null
+  run_name: null            # default: <name>_seed<seed>
+  tags: [vae, ecg-generation, mimic-iv-ecg]
   notes: "VAE training on MIMIC-IV-ECG for latent representation learning"
-  log_model: false  # Log model checkpoints to wandb
-  log_freq: 50  # Log frequency (steps)
+  log_model: false
 
 model:
-  target: ecgen.models.vae.VAELightning
+  name: vae                 # ecgen.families.vae.VAELightning
   params:
-    config:
-      in_channels: 12
-      base_channels: 64
-      latent_channels: 8
-      channel_multipliers: [1, 2, 4, 4]
-      num_res_blocks: 2
-      lr: 0.0001
-      kl_weight: 0.0001
-      b1: 0.9
-      b2: 0.999
+    in_channels: 12
+    base_channels: 64
+    latent_channels: 8
+    channel_multipliers: [1, 2, 4, 4]
+    num_res_blocks: 2
+    lr: 0.0001
+    kl_weight: 0.0001
+    b1: 0.9
+    b2: 0.999
 
 data:
-  target: ecgen.data.mimic_dataset.MIMICIVECGDataset
-  params:
-    mimic_path: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
-    batch_size: 32
-    num_workers: 4
-    max_samples: 10000  # Use full dataset (set to 1000 for quick testing)
-    skip_missing_check: false
-    val_split: 0.1
-    test_split: 0.1
-    num_leads: 12
-    seq_length: 5000
+  dataset:
+    name: mimic_iv_ecg      # ecgen.data.datasets.MIMICIVECG
+    params:
+      root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+      max_samples: 10000    # null = full dataset; 1000 for quick tests
+      skip_missing_check: false
+      val_split: 0.1
+      test_split: 0.1
+      leads: null           # null = all 12 in file order (I, II, III, aVR, aVF, aVL, V1-V6)
+      seq_length: 5000
+      scale: zscore         # per-record z-score (legacy); "none" keeps mV
+  batch_size: 32
+  num_workers: 4
+
+checkpoint:
+  monitor: val_loss
+  mode: min
+  save_top_k: 3
 
 callbacks:
-  - target: pytorch_lightning.callbacks.ModelCheckpoint
+  - name: early_stopping
+    params: {monitor: val_loss, patience: 10, mode: min, verbose: true}
+  - name: lr_monitor
+    params: {logging_interval: step}
+  - name: vae_visualization  # saves to ${run_dir}/samples
     params:
-      dirpath: runs/vae_mimic/seed_42/checkpoints
-      filename: epoch{epoch:03d}-step{step:06d}
-      save_last: true
-      save_top_k: 3
-      monitor: val_loss
-      mode: min
-  - target: pytorch_lightning.callbacks.EarlyStopping
-    params:
-      monitor: val_loss
-      patience: 10
-      mode: min
-      verbose: true
-  - target: pytorch_lightning.callbacks.LearningRateMonitor
-    params:
-      logging_interval: step
+      log_every_n_epochs: 5
+      num_samples: 4
+      plot_all_leads: true
+      log_to_tensorboard: false
+      log_to_wandb: true
 
 trainer:
   max_epochs: 100
-  accelerator: "gpu"
+  accelerator: gpu
   devices: [0]
   log_every_n_steps: 50
   check_val_every_n_epoch: 5
   gradient_clip_val: 1.0
   deterministic: true
-
-visualization:
-  every_n_epochs: 5  # Generate visualizations every N epochs
-  num_samples: 4  # Number of samples to visualize
-  plot_all_leads: true  # Plot all leads separately (false for overlay)
-  log_to_tensorboard: false  # Log to TensorBoard
-  log_to_wandb: true  # Log to Weights & Biases (set to true if using wandb)

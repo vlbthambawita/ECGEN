@@ -1,6 +1,8 @@
 # Training
 
-Training utilities, callbacks, losses, and metrics.
+Training metrics and older helpers. The runner, callbacks and family losses moved to the `ecgen`
+package (`ecgen.training.runner`, `ecgen.training.callbacks`, `ecgen.families.*.losses`); the files
+left in `callbacks/` and `losses/` are re-export shims kept for one release.
 
 ## Structure
 
@@ -19,7 +21,7 @@ Training utilities, callbacks, losses, and metrics.
 - `trainers/` - Training loops
   - `base_trainer.py` - Base trainer class
   - `vae_trainer.py` - VAE training
-  - `gan_trainer.py` - GAN training
+  - `gan_trainer.py` - deprecated wrapper around `ecgen.training.runner` (use `ecgen train`)
 
 ## Usage
 

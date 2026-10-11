@@ -176,7 +176,7 @@ ModelBenchmark(model, device: str = "cuda")
 
 ```python
 from evaluation.benchmark import ModelBenchmark
-from models.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
+from ecgen.families.gan.pulse2pulse import Pulse2PulseGAN, Pulse2PulseConfig
 
 model = Pulse2PulseGAN(Pulse2PulseConfig()).netG.to("cuda")   # move it yourself
 bench = ModelBenchmark(model, device="cuda")

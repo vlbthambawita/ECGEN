@@ -1,20 +1,23 @@
 # Utilities API
 
-Auto-generated from docstrings.
+Small helpers in `ecgen.utils`. The root `utils/` modules are deprecated re-export shims of these.
 
-## `utils.seed`
+## Config
 
-::: utils.seed
+::: ecgen.utils.config
 
-## `utils.io`
+## Seed
 
-::: utils.io
+::: ecgen.utils.seed
 
-## `utils.logging`
+## I/O
 
-::: utils.logging
+::: ecgen.utils.io
 
-## `utils.metadata`
+## Logging
 
-::: utils.metadata
+::: ecgen.utils.logging
 
+## Run metadata
+
+::: ecgen.utils.metadata

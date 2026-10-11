@@ -25,7 +25,7 @@ YAML configuration files for experiments, models, datasets, and training.
 ### Using Experiment Configs
 
 ```bash
-python scripts/train/train_vae_mimic.py --config configs/experiments/vae_mimic.yaml
+ecgen train configs/experiments/vae_mimic.yaml [dotted.key=value ...]
 ```
 
 ### Composing Configs

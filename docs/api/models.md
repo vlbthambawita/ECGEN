@@ -2,55 +2,58 @@
 
 Auto-generated from docstrings.
 
-## `models.components.blocks`
+## `ecgen.families.base`
 
-::: models.components.blocks
+::: ecgen.families.base
 
-## `models.components.encoders`
+## `ecgen.nn.blocks`
 
-::: models.components.encoders
+::: ecgen.nn.blocks
 
-## `models.components.decoders`
+## `ecgen.nn.encoders`
 
-::: models.components.decoders
+::: ecgen.nn.encoders
 
-## `models.vae.config`
+## `ecgen.nn.decoders`
 
-::: models.vae.config
+::: ecgen.nn.decoders
 
-## `models.vae.vae_1d`
+## `ecgen.families.vae.config`
 
-::: models.vae.vae_1d
+::: ecgen.families.vae.config
 
-## `models.vae.vae_lightning`
+## `ecgen.families.vae.vae_1d`
 
-::: models.vae.vae_lightning
+::: ecgen.families.vae.vae_1d
 
-## `models.vqvae.config`
+## `ecgen.families.vae.vae_lightning`
 
-::: models.vqvae.config
+::: ecgen.families.vae.vae_lightning
 
-## `models.vqvae.vector_quantizer`
+## `ecgen.families.vqvae.config`
 
-::: models.vqvae.vector_quantizer
+::: ecgen.families.vqvae.config
 
-## `models.vqvae.vqvae_1d`
+## `ecgen.families.vqvae.vector_quantizer`
 
-::: models.vqvae.vqvae_1d
+::: ecgen.families.vqvae.vector_quantizer
 
-## `models.vqvae.vqvae_lightning`
+## `ecgen.families.vqvae.vqvae_1d`
 
-::: models.vqvae.vqvae_lightning
+::: ecgen.families.vqvae.vqvae_1d
 
-## `models.vqvae.pixelcnn_prior`
+## `ecgen.families.vqvae.vqvae_lightning`
 
-::: models.vqvae.pixelcnn_prior
+::: ecgen.families.vqvae.vqvae_lightning
 
-## `models.vqvae.prior_lightning`
+## `ecgen.families.vqvae.pixelcnn_prior`
 
-::: models.vqvae.prior_lightning
+::: ecgen.families.vqvae.pixelcnn_prior
 
-## `models.gan.pulse2pulse`
+## `ecgen.families.vqvae.prior_lightning`
 
-::: models.gan.pulse2pulse
+::: ecgen.families.vqvae.prior_lightning
 
+## `ecgen.families.gan.pulse2pulse`
+
+::: ecgen.families.gan.pulse2pulse

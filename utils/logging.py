@@ -1,16 +1,3 @@
-import logging
-from typing import Optional
+"""Deprecated shim: moved to :mod:`ecgen.utils.logging`."""
 
-
-def get_logger(name: Optional[str] = None) -> logging.Logger:
-    """
-    Get a logger with a simple, consistent format.
-    """
-
-    logger = logging.getLogger(name)
-    if not logging.getLogger().handlers:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
-        )
-    return logger
+from ecgen.utils.logging import *  # noqa: F401,F403
