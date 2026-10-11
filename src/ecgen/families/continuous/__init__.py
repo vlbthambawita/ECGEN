@@ -4,6 +4,14 @@ from ecgen.families.continuous.module import (
     ContinuousConfig,
     ContinuousGenerativeModule,
     DiffusionModule,
+    FlowMatchingConfig,
+    FlowMatchingModule,
 )
 
-__all__ = ["ContinuousConfig", "ContinuousGenerativeModule", "DiffusionModule"]
+__all__ = [
+    "ContinuousConfig",
+    "ContinuousGenerativeModule",
+    "DiffusionModule",
+    "FlowMatchingConfig",
+    "FlowMatchingModule",
+]

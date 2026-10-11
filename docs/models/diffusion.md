@@ -1,4 +1,4 @@
-# Diffusion
+# Diffusion and flow matching
 
 `DiffusionModule` (registry name `diffusion`) is a Gaussian diffusion model
 (DDPM, Ho et al., 2020) over raw 12-lead ECGs. It is one instance of
@@ -10,7 +10,8 @@
 | **Backbone** — the network `f(x_t, t, cond)` | `model.params.backbone` | `unet1d` |
 | **Conditioning** — what the model is conditioned on | `model.params.conditioning` | see [Conditioning](../training/conditioning.md) |
 
-Flow matching (Phase 4) reuses the same module with another process.
+`FlowMatchingModule` (registry name `flow_matching`) is the same module with the
+`rectified_flow` process as its default — see [Flow matching](#flow-matching).
 
 ## DDPM process (`ddpm`)
 
@@ -24,6 +25,29 @@ Flow matching (Phase 4) reuses the same module with another process.
 
 Sampling is DDIM (Song et al., 2021) over `steps` evenly spaced steps;
 `eta=0` is deterministic, `eta=1` ancestral.
+
+## Flow matching
+
+Process `rectified_flow` (family `flow_matching`): time runs from noise
+(`t = 0`) to data (`t = 1`) along straight paths
+`x_t = t·x1 + (1 − (1 − σ_min)·t)·x0`; the network regresses the velocity
+`x1 − (1 − σ_min)·x0`, and sampling integrates the ODE with Euler or Heun steps.
+Typically 10–25 steps (Heun: two network calls per step) give samples
+comparable to 50+ DDIM steps.
+
+| Param | Default | Meaning |
+|---|---|---|
+| `t_sampling` | `"logit_normal"` | Training time distribution (`"uniform"` or logit-normal, Esser et al. 2024) |
+| `logit_mean`, `logit_std` | `0.0`, `1.0` | Logit-normal parameters |
+| `sigma_min` | `0.0` | Path width at `t = 1` (0 = rectified flow) |
+| `ot_coupling` | `false` | Minibatch optimal-transport pairing of noise and data (OT-CFM) |
+| `time_scale` | `1000.0` | Network time input = `t · time_scale` |
+| `solver` | `"euler"` | Default ODE solver (`"euler"` or `"heun"`); override per call with `sample(solver=...)` |
+
+Everything else — backbone, conditioning, CFG (on the velocity), EMA,
+`loss_on`, `clean_observed` — is shared with diffusion. Training-free
+inpainting supports `replace` (the observed part follows its straight path from
+the initial noise); RePaint is diffusion-only.
 
 ## U-Net backbone (`unet1d`)
 
@@ -76,6 +100,7 @@ the output unless `paste_observed=False`.
 - `configs/experiments/diffusion_mimic.yaml` — unconditional
 - `configs/experiments/diffusion_mimic_conditional.yaml` — conditioned on the machine measurements, CFG
 - `configs/experiments/diffusion_mimic_leads.yaml` — lead reconstruction / imputation
+- `configs/experiments/flow_matching_mimic.yaml` — conditional flow matching
 
 Evaluate lead reconstruction with
 `python scripts/evaluate/lead_reconstruction.py <ckpt> --family diffusion --keep I`

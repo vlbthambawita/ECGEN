@@ -68,6 +68,8 @@ Auto-generated from docstrings.
 
 ::: ecgen.processes.ddpm
 
+::: ecgen.processes.flow
+
 ## `ecgen.nn.backbones.unet1d`
 
 ::: ecgen.nn.backbones.unet1d

@@ -2,11 +2,16 @@
 Generative-model families.
 
 Importing this package registers the built-in families in
-``ecgen.registry.FAMILIES``: ``vae``, ``vqvae``, ``vqvae_prior``, ``pulse2pulse``, ``diffusion``.
+``ecgen.registry.FAMILIES``: ``vae``, ``vqvae``, ``vqvae_prior``, ``pulse2pulse``, ``diffusion``, ``flow_matching``.
 """
 
 from ecgen.families.base import Capabilities, GenerativeModule
-from ecgen.families.continuous import ContinuousConfig, ContinuousGenerativeModule, DiffusionModule
+from ecgen.families.continuous import (
+    ContinuousConfig,
+    ContinuousGenerativeModule,
+    DiffusionModule,
+    FlowMatchingModule,
+)
 from ecgen.families.gan import Pulse2PulseConfig, Pulse2PulseGAN
 from ecgen.families.vae import VAEConfig, VAELightning
 from ecgen.families.vqvae import (
@@ -21,6 +26,7 @@ __all__ = [
     "ContinuousConfig",
     "ContinuousGenerativeModule",
     "DiffusionModule",
+    "FlowMatchingModule",
     "GenerativeModule",
     "Pulse2PulseConfig",
     "Pulse2PulseGAN",

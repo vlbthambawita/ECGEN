@@ -1,0 +1,47 @@
+# Flow matching (rectified flow, logit-normal times) with the same 1D U-Net,
+# conditioned on the MIMIC machine measurements (drop the conditioning block for
+# an unconditional model).
+#   ecgen train configs/experiments/flow_matching_mimic.yaml
+# Sample: FlowMatchingModule.load_from_checkpoint(ckpt).sample(n, steps=25, solver="heun",
+#                                                             cond={...}, guidance=2.0)
+
+experiment: {name: flow_matching_mimic, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-flow}
+
+model:
+  name: flow_matching
+  params:
+    in_channels: 12
+    process:
+      name: rectified_flow
+      params: {t_sampling: logit_normal, sigma_min: 0.0, ot_coupling: false, solver: heun}
+    backbone: {name: unet1d, params: {base_channels: 64, channel_mults: [1, 2, 4, 4], attn_levels: [3]}}
+    conditioning:
+      vector_dim: 256
+      encoders:
+        - {field: measurements, name: fourier, params: {num_features: 9, dim: 256}}
+      dropout: {measurements: 0.15}
+    lr: 0.0002
+    warmup_steps: 1000
+    ema_decay: 0.9995
+    sample_steps: 25
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params: {root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0, max_samples: 50000, leads: standard12, scale: zscore, missing: mask}
+  split_params: {val: {max_samples: 1000}}
+  batch_size: 32
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

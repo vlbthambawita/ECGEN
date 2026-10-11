@@ -74,13 +74,13 @@ class ContinuousGenerativeModule(GenerativeModule):
     family = "continuous"
     supports = Capabilities(conditional=True, cfg=True, inpainting=True)
     accepts = frozenset({"vector", "tokens", "dense"})
-    default_process: Dict[str, Any] = {"name": "ddpm"}
+    config_cls: type = ContinuousConfig
 
     def __init__(
         self, config: ContinuousConfig | dict[str, Any] | None = None, **kwargs: Any
     ) -> None:
         super().__init__()
-        config = resolve_config(ContinuousConfig, config, kwargs)
+        config = resolve_config(self.config_cls, config, kwargs)
         if config.loss_on not in ("all", "unobserved"):
             raise ValueError(
                 f"loss_on must be 'all' or 'unobserved', got {config.loss_on!r}"
@@ -292,3 +292,18 @@ class DiffusionModule(ContinuousGenerativeModule):
     """Gaussian diffusion (default process ``ddpm``); see :class:`ContinuousGenerativeModule`."""
 
     family = "diffusion"
+
+
+@dataclass
+class FlowMatchingConfig(ContinuousConfig):
+    """:class:`ContinuousConfig` with the rectified-flow process as default."""
+
+    process: Dict[str, Any] = field(default_factory=lambda: {"name": "rectified_flow"})
+
+
+@FAMILIES.register("flow_matching")
+class FlowMatchingModule(ContinuousGenerativeModule):
+    """Flow matching (default process ``rectified_flow``); see :class:`ContinuousGenerativeModule`."""
+
+    family = "flow_matching"
+    config_cls = FlowMatchingConfig
