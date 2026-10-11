@@ -133,6 +133,7 @@ class ECGDataModule(pl.LightningDataModule):
             "lead_names": list(ds.lead_names),
             "fs": ds.fs,
             "seq_length": ds.seq_length,
+            "scale": getattr(ds, "scale", None),
             "feature_normalizer": norm.to_dict() if norm is not None else None,
             "normalizers": {f: n.to_dict() for f, n in train.field_normalizers.items()},
         }

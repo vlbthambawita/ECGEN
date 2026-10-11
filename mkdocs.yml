@@ -130,6 +130,7 @@ nav:
   - Training:
       - Training with ecgen train: training/runner.md
       - Conditioning: training/conditioning.md
+      - Sampling: training/sampling.md
       - Training Guide: training/guide.md
       - VAE Training: training/vae_training.md
       - VQ-VAE Training: training/vqvae_training.md

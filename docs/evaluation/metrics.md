@@ -35,6 +35,30 @@ from evaluation.metrics.fidelity import frechet_distance   # not re-exported
     module is imported, so importing `evaluation.metrics` or `evaluation.visualize` fails on
     Python 3.8/3.9, even though `pyproject.toml` declares `requires-python = ">=3.8"`.
 
+## `ecgen.evaluation` (packaged metrics)
+
+The `ecgen` package ships the metrics from the training plan (§8). They take
+`[N, C, T]` arrays or tensors.
+
+| Function | What it measures |
+|---|---|
+| `distribution_metrics(real, fake, fs, extractor=None)` | Fréchet distance, MMD (RBF, median bandwidth) and k-NN precision / recall on standardized features — hand-crafted by default (`handcrafted_features`: heart rate, per-lead amplitude percentiles and band powers, inter-lead correlations), or any network via `module_features(model)` |
+| `heart_rate(x, fs, method="simple" \| "neurokit")`, `adherence(requested, measured)` | Requested vs. measured heart rate (MAE, Pearson r) — condition adherence for measurement conditioning |
+| `fit_classifier`, `label_adherence`, `tstr` | A small 1D-ResNet: train it on real labelled ECGs (separate from the generator's training data), then score generated ECGs against the labels they were generated for (macro AUROC), or train on synthetic and test on real (TSTR) |
+| `reconstruction_metrics(pred, true, unobserved)` | MAE, RMSE, Pearson r on the unobserved part (lead reconstruction, imputation) |
+| `inter_lead_correlation_error(real, fake)` | Mean absolute difference of the average lead-correlation matrices (MIDT-ECG) |
+| `einthoven_residual(x, lead_names)` | Relative violation of III = II − I, aVR, aVL, aVF identities (≈0 for real 12-lead ECGs) |
+| `memorization_ratio(fake, train, real_holdout)` | Nearest-neighbour distance of generated ECGs to the training set relative to held-out real ECGs (≪ 1 suggests copying) |
+
+```bash
+ecgen sample runs/.../last.ckpt -n 256 -o gen/ --format npy
+ecgen evaluate gen/samples.npy configs/experiments/diffusion_mimic.yaml --split test -n 256
+python scripts/evaluate/condition_adherence.py <ckpt> --family diffusion --target rr_interval
+python scripts/evaluate/lead_reconstruction.py <ckpt> --family diffusion --keep I
+```
+
+The sections below document the older research-layout metrics in `evaluation/`.
+
 ## Signal quality (`evaluation/metrics/signal_quality.py`)
 
 These are reference-free metrics computed on a single signal.

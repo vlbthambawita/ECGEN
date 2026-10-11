@@ -196,7 +196,10 @@ class GenerativeModule(pl.LightningModule):
         self.data_info = dict(info)
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        from ecgen.registry import FAMILIES
+
         checkpoint["ecgen_data_info"] = self.data_info
+        checkpoint["ecgen_family"] = FAMILIES.name_of(self)
 
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         self.data_info = dict(checkpoint.get("ecgen_data_info") or {})

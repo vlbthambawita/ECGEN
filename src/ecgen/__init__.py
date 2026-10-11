@@ -7,7 +7,19 @@ try:
 except ImportError:  # source tree without an install (e.g. PYTHONPATH usage)
     __version__ = "0.0.0+unknown"
 
+from ecgen.api import load_model, sample
 from ecgen.generate import generate
 from ecgen.plot import plot_ecg
 
-__all__ = ["data", "f", "generate", "models", "plot_ecg", "training", "evaluation", "utils"]
+__all__ = [
+    "data",
+    "evaluation",
+    "f",
+    "generate",
+    "load_model",
+    "models",
+    "plot_ecg",
+    "sample",
+    "training",
+    "utils",
+]

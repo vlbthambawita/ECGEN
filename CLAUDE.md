@@ -24,6 +24,8 @@ ecgen train configs/experiments/vqvae_mimic.yaml                     # VQ-VAE st
 ecgen train configs/experiments/prior_mimic.yaml model.params.vqvae_checkpoint=<stage1.ckpt>
 ecgen train configs/experiments/pulse2pulse_mimic.yaml
 ecgen list                                             # registered families / datasets / callbacks
+ecgen sample <ckpt> -n 16 -o out/ --format csv [--cond field=v1,v2] [--guidance 2] [--steps 50]
+ecgen evaluate out/samples.npy <config.yaml>           # Fréchet / MMD / precision-recall vs real test ECGs
 python -m ecgen train ...                              # same without the console script
 ./scripts/shell/run_train_*.sh [config] [key=value ...]  # thin wrappers around the runner
 ```
@@ -67,6 +69,9 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.da
 MkDocs Material site in `docs/` (config: `mkdocs.yml`; API pages in `docs/api/` are rendered by mkdocstrings from Google-style docstrings). Preview with `pip install -r requirements-docs.txt && mkdocs serve`; CI (`.github/workflows/docs.yml`) runs `mkdocs build --strict` and publishes to the `gh-pages` branch on pushes to `main`/`simple`. New pages must be added to `nav` in `mkdocs.yml`.
 
 ## Published `ecgen` package
+
+- **Sampling any trained model:** `ecgen.sample(ckpt, n, cond=..., obs=..., guidance=..., steps=..., output_dir=, format=npy|csv|wfdb, derive_12=, plot=)` / `ecgen.load_model(ckpt)` (`src/ecgen/api.py`); checkpoints record `ecgen_family` and `ecgen_data_info` (incl. `scale`). A condition value with a leading dim of `n` (or `n` strings, or `n` ints) is per-sample, otherwise broadcast.
+- **Evaluation:** `ecgen.evaluation` (`measure`, `features`, `metrics`, `classifier`): distribution metrics, HR / label adherence, TSTR, reconstruction, inter-lead correlation error, Einthoven residual, memorisation. `ecgen.data.leads.derive_standard12` completes 8 independent leads to 12.
 
 - **Generation:** `ecgen.generate(model_path, n_samples, output_dir, ...)` (`src/ecgen/generate.py`) loads a Pulse2Pulse checkpoint and writes one CSV per sample (5000 rows × 8 leads `I, II, V1–V6`), optionally with a plot. Original Pulse2Pulse-repo checkpoints use `Conv1dTrans`/`ppfilter1` keys, which `_remap_state_dict()` rewrites. `hf://<repo_id>/<path>` model paths go through `_resolve_model_path()`, which uses `HF_TOKEN` from the environment or a `.env` in CWD. Use `denorm=6000.0` for models trained on `ECGDataSimple`.
 - **Plots:** `ecgen.plot_ecg` (`src/ecgen/plot.py`) renders an ECG grid sheet as self-contained D3 HTML or SVG (pure Python), or PDF via `cairosvg` (`ecgen[plot]`).

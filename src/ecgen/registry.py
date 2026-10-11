@@ -86,6 +86,14 @@ class Registry(Generic[T]):
         params: Optional[Mapping[str, Any]] = spec.get("params")
         return self.resolve(spec)(**dict(params or {}), **extra)
 
+    def name_of(self, obj: Any) -> Optional[str]:
+        """Registered name of ``obj`` (or of its class), if any."""
+        cls = obj if isinstance(obj, type) else type(obj)
+        for name, item in self._items.items():
+            if item is cls:
+                return name
+        return None
+
     def __contains__(self, name: object) -> bool:
         return name in self._items
 

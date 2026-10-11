@@ -71,3 +71,41 @@ def lead_indices(names: Sequence[str], available: Sequence[str]) -> List[int]:
 def maybe_lead_names(n: int, names: Optional[Sequence[str]]) -> List[str]:
     """``names`` if given, else ``["lead0", "lead1", ...]``."""
     return list(names) if names is not None else [f"lead{i}" for i in range(n)]
+
+
+def derive_standard12(x, lead_names: Sequence[str]):
+    """
+    Complete 8 independent leads (I, II, V1–V6, any order) to the standard 12
+    using Einthoven / Goldberger: III = II − I, aVR = −(I + II)/2,
+    aVL = I − II/2, aVF = II − I/2.
+
+    Args:
+        x: ``[..., C, T]`` tensor or array with leads ``lead_names``.
+
+    Returns:
+        ``[..., 12, T]`` in :data:`STANDARD_12` order (same type as ``x``).
+    """
+    import numpy as np
+
+    idx = {n: i for i, n in enumerate(lead_names)}
+    missing = [n for n in INDEPENDENT_8 if n not in idx]
+    if missing:
+        raise ValueError(
+            f"derive_standard12 needs leads {list(INDEPENDENT_8)}; missing {missing}"
+        )
+    i, ii = x[..., idx["I"], :], x[..., idx["II"], :]
+    derived = {
+        "III": ii - i,
+        "aVR": -(i + ii) / 2,
+        "aVL": i - ii / 2,
+        "aVF": ii - i / 2,
+    }
+    leads = [derived[n] if n in derived else x[..., idx[n], :] for n in STANDARD_12]
+    try:
+        import torch
+
+        if isinstance(x, torch.Tensor):
+            return torch.stack(leads, dim=-2)
+    except ImportError:  # pragma: no cover
+        pass
+    return np.stack(leads, axis=-2)
