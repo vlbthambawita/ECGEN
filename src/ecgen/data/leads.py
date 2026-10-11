@@ -4,7 +4,7 @@ Lead names and lead selection.
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 
 # Standard clinical order of the 12 leads
 STANDARD_12: tuple[str, ...] = (
@@ -73,7 +73,7 @@ def maybe_lead_names(n: int, names: Optional[Sequence[str]]) -> List[str]:
     return list(names) if names is not None else [f"lead{i}" for i in range(n)]
 
 
-def derive_standard12(x, lead_names: Sequence[str]):
+def derive_standard12(x: Any, lead_names: Sequence[str]) -> Any:
     """
     Complete 8 independent leads (I, II, V1–V6, any order) to the standard 12
     using Einthoven / Goldberger: III = II − I, aVR = −(I + II)/2,

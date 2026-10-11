@@ -108,6 +108,7 @@ extra:
 
 nav:
   - Home: index.md
+  - Concepts: concepts.md
   - Getting Started:
       - Installation: getting_started/installation.md
       - Quick Start: getting_started/quickstart.md
@@ -127,6 +128,8 @@ nav:
       - VAE: visual/vae.md
       - VQ-VAE + Prior: visual/vqvae.md
       - Pulse2Pulse GAN: visual/pulse2pulse.md
+      - Diffusion (DDPM): visual/diffusion.md
+      - Flow Matching: visual/flow_matching.md
   - Training:
       - Training with ecgen train: training/runner.md
       - Conditioning: training/conditioning.md
@@ -141,6 +144,7 @@ nav:
       - Evaluation Metrics: evaluation/metrics.md
       - Visualization: visualization/guide.md
   - Standalone VQ-VAE: standalone/vqvae_standalone.md
+  - Extending ECGEN: extending.md
   - API Reference:
       - Models: api/models.md
       - Data: api/data.md

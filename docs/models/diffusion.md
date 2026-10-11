@@ -1,5 +1,9 @@
 # Diffusion and flow matching
 
+!!! tip "Visual guide"
+    Animated diagrams of the noising process, the `UNet1d` backbone, guidance, the loss and
+    sampling: [Diffusion (DDPM)](../visual/diffusion.md) and [Flow Matching](../visual/flow_matching.md).
+
 `DiffusionModule` (registry name `diffusion`) is a Gaussian diffusion model
 (DDPM, Ho et al., 2020) over raw 12-lead ECGs. It is one instance of
 `ContinuousGenerativeModule`, which separates three choices:

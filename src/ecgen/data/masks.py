@@ -75,7 +75,8 @@ class LeadSubset(MaskGenerator):
         keep: List of lead-name lists; one is chosen uniformly per sample
             (e.g. ``[[I], [I, II]]`` = "single lead I" or "leads I and II").
             If omitted, a random subset of ``min_leads..max_leads`` leads is kept.
-        min_leads, max_leads: Range for the random subset.
+        min_leads: Smallest random subset.
+        max_leads: Largest random subset.
     """
 
     def __init__(

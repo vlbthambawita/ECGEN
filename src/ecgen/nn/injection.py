@@ -63,7 +63,7 @@ class FiLM(nn.Module):
 
 
 class AdaGN(nn.Module):
-    """GroupNorm without affine parameters, then FiLM from the condition."""
+    """GroupNorm, then FiLM from the condition (zero-initialised, so it starts as plain GroupNorm)."""
 
     def __init__(self, cond_dim: int, channels: int, groups: int = 8) -> None:
         super().__init__()

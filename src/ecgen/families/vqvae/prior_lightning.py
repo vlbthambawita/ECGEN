@@ -151,7 +151,8 @@ class PriorLightning(GenerativeModule):
             seq_length: Length of ECG sequence
             temperature: Sampling temperature
             cond: Raw condition values (conditional priors)
-            obs, obs_mask: Partially observed ECG and its mask (dense conditions)
+            obs: Partially observed ECG (dense conditions)
+            obs_mask: Mask of ``obs`` (1 = observed)
             guidance: Classifier-free guidance scale (1 = off)
 
         Returns:

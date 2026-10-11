@@ -153,7 +153,8 @@ class CompositeConditioner(nn.Module):
         Args:
             cond: Normalized condition fields; a missing key means "not given".
             cond_missing: Per-field missing masks.
-            obs, obs_mask: Partially observed ECG ``[B, C, T]`` and its mask (1 = observed).
+            obs: Partially observed ECG ``[B, C, T]``.
+            obs_mask: Mask of ``obs`` (1 = observed).
             batch_size: Needed when no field is given at all.
             drop: ``"all"``, field name(s), or ``{field: [B] bool}`` to force nulls
                 (e.g. the unconditional half of classifier-free guidance).

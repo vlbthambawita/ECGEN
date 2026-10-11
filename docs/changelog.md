@@ -1,3 +1,17 @@
+# Changes Summary - Generative Training Library, Phases 1–8 (Unreleased)
+
+Phases 1–8 of `PLAN_TRAINING_LIBRARY.md`, on top of Phase 0 below.
+
+- **Conditioning (Phase 1).** `ecgen.conditioning`: field encoders (`categorical`, `multilabel`, `numeric`, `fourier`, `masked_signal`, later `text_hash`, `text`) → `ConditionOutput(vector, tokens, dense)`; per-field dropout with learned null embeddings; zero-initialised injection layers (`FiLM`, `AdaGN`, `AdaLNZero`, `AddToTimeEmb`, `CrossAttention1d`); observation masks (`data.masks`); checkpoints carry the training data contract so `sample(cond=...)` takes raw units.
+- **Conditional families (Phase 2).** Conditional VAE (FiLM, learned prior, `latent_type: global`), conditional / paired Pulse2Pulse (projection critic, lead reconstruction with L1, `output_scale`), conditional PixelCNN prior with classifier-free guidance. **Fix:** the Pulse2Pulse critic's final layer was never in its optimizer.
+- **Diffusion (Phase 3)** and **flow matching (Phase 4)** in one `ContinuousGenerativeModule`: DDPM (ε/v/x₀, cosine/linear, min-SNR, DDIM/ancestral) and rectified flow (logit-normal t, OT coupling, Euler/Heun); `unet1d` backbone; EMA; CFG; SSSD-style partial-ECG training; training-free replace / RePaint inpainting.
+- **Latent models and backbones (Phase 5).** `latent_diffusion`, `latent_flow_matching` on frozen VAE / VQ-VAE; `dit1d`, `ssm` (S4D), `mamba` backbones.
+- **PTB-XL and text (Phase 6).** `ptbxl` dataset (SCP vocabularies, demographics, sex, reports, PTB-XL+ features, recommended folds); report text conditioning.
+- **Evaluation and sampling (Phase 7).** `ecgen.evaluation` (distribution metrics, HR and label adherence, TSTR classifier, reconstruction, inter-lead correlation, Einthoven residual, memorisation); `ecgen.sample` / `ecgen sample` / `ecgen evaluate`; checkpoints record their family.
+- **Docs and packaging (Phase 8).** Concepts, Extending ECGEN, conditioning, sampling, diffusion & flow, PTB-XL pages; Visual Guide pages for diffusion and flow matching; extras `text`, `ssm`, `eval`.
+
+---
+
 # Changes Summary - Training Moved Into the `ecgen` Package (Unreleased)
 
 ## Overview

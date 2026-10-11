@@ -10,10 +10,13 @@ a diagram to change its inputs.
 | [VAE](vae.md) | `VAE1D` / `VAELightning` | a Gaussian latent sequence `z ~ N(0, I)` |
 | [VQ-VAE + Prior](vqvae.md) | `VQVAE1D` + `PixelCNNPrior` | code indices sampled by an autoregressive prior |
 | [Pulse2Pulse GAN](pulse2pulse.md) | `WaveGANGenerator` + `WaveGANDiscriminator` | uniform noise with the shape of an ECG |
+| [Diffusion (DDPM)](diffusion.md) | `DiffusionModule` + `DDPMProcess` + `UNet1d` | Gaussian noise `(n, 12, 5000)`, denoised in ~50 DDIM steps |
+| [Flow Matching](flow_matching.md) | `FlowMatchingModule` + `RectifiedFlowProcess` + `UNet1d` | Gaussian noise, moved along a learned velocity field with Euler / Heun steps |
 
 All shapes and hyper-parameters in the diagrams are the **defaults** in `src/ecgen/families/` and
 `src/ecgen/nn/`. The written reference for each model is under *Models*
-([VAE](../models/vae.md), [VQ-VAE](../models/vqvae.md), [Pulse2Pulse](../models/gan.md)).
+([VAE](../models/vae.md), [VQ-VAE](../models/vqvae.md), [Pulse2Pulse](../models/gan.md),
+[Diffusion and flow matching](../models/diffusion.md)).
 
 ## Legend
 
@@ -147,16 +150,19 @@ Use `VQVAELightning.downsample_factor` / `latent_length()` in code instead of ha
 
 ## At a glance
 
-| | VAE | VQ-VAE + prior | Pulse2Pulse |
-|---|---|---|---|
-| Leads × samples | 12 × 5000 | 12 × 5000 | 8 × 5000 |
-| Latent | continuous, `(8, 625)` | discrete, 625 indices into a 512 × 64 codebook | none: noise `(8, 5000)` |
-| Training stages | 1 | 2 (VQ-VAE, then prior on frozen codes) | 1 (adversarial, 2 optimisers) |
-| Loss | MSE + `kl_weight` · KL | MSE + VQ loss; then cross-entropy | WGAN-GP critic loss; −D(G(z)) |
-| Sampling cost | 1 decoder pass | 625 sequential prior steps + 1 decoder pass | 1 generator pass |
-| Output range | unbounded | unbounded | `tanh`, [−1, 1] |
+| | VAE | VQ-VAE + prior | Pulse2Pulse | Diffusion | Flow matching |
+|---|---|---|---|---|---|
+| Leads × samples | 12 × 5000 | 12 × 5000 | 8 × 5000 | 12 × 5000 | 12 × 5000 |
+| Latent | continuous, `(8, 625)` | discrete, 625 indices into a 512 × 64 codebook | none: noise `(8, 5000)` | none: noise `(12, 5000)` | none: noise `(12, 5000)` |
+| Training stages | 1 | 2 (VQ-VAE, then prior on frozen codes) | 1 (adversarial, 2 optimisers) | 1 | 1 |
+| Loss | MSE + `kl_weight` · KL | MSE + VQ loss; then cross-entropy | WGAN-GP critic loss; −D(G(z)) | min-SNR-weighted MSE on v | MSE on velocity x₁ − x₀ |
+| Sampling cost | 1 decoder pass | 625 sequential prior steps + 1 decoder pass | 1 generator pass | 50 UNet passes (DDIM; × 2 with guidance) | 10–50 UNet passes (Euler / Heun) |
+| Output range | unbounded | unbounded | `tanh`, [−1, 1] | unbounded | unbounded |
+| Conditioning | — | — | — | vector, tokens, dense; CFG | vector, tokens, dense; CFG |
 
-## Not yet implemented
+## Not covered yet
 
-`models/diffusion/` and `models/ssm/` are placeholders. When they are implemented, they will get pages
-in this section too.
+Latent diffusion and latent flow matching (`src/ecgen/families/continuous/latent.py`) run the
+same processes as the [Diffusion](diffusion.md) and [Flow Matching](flow_matching.md) pages in the
+latent space of a frozen VAE or VQ-VAE; see [Diffusion and flow matching](../models/diffusion.md).
+They do not have their own visual page yet.

@@ -33,7 +33,8 @@ class S4D(nn.Module):
     Args:
         channels: ``H``.
         state_size: ``N``; ``N / 2`` complex conjugate pairs are kept.
-        dt_min, dt_max: Range of the (learned, log-uniform initialised) step sizes.
+        dt_min: Smallest initial step size (learned, log-uniform initialised).
+        dt_max: Largest initial step size.
         bidirectional: Also run a kernel over the reversed sequence.
     """
 
@@ -135,8 +136,9 @@ class SSMBackbone(nn.Module):
         state_size: S4D state size ``N``.
         bidirectional: Non-causal (two-sided) kernels.
         dropout: Dropout after the gate.
-        cond_dim, dense_channels: Condition sizes (vector added to the time
-            embedding; dense concatenated to the input). Tokens are not supported.
+        cond_dim: Size of the condition vector, added to the time embedding (0 = none).
+        dense_channels: Channels of dense conditions, concatenated to the input.
+            Tokens are not supported.
     """
 
     accepts = frozenset({"vector", "dense"})

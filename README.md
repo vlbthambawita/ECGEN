@@ -4,14 +4,36 @@
 
 ## Overview
 
-ECGEN provides two deep generative models for ECG signals, both trained primarily on the [MIMIC-IV-ECG](https://physionet.org/content/mimic-iv-ecg/1.0/) dataset (12-lead, 5000 samples/signal):
+ECGEN trains and samples generative models of 12-lead ECGs through one library
+and one command (`ecgen train <config.yaml>`), on MIMIC-IV-ECG, PTB-XL, or
+your own data. Training methods, networks, and conditions are independent,
+swappable parts (see [Concepts](https://vajira.info/ECGEN/concepts/)):
 
-| Model | Type | Leads | Purpose |
-|---|---|---|---|
-| **VAE** | Variational Autoencoder | 12 | Unsupervised latent representation & reconstruction |
-| **Pulse2Pulse** | WaveGAN (WGAN-GP) | 8 | Conditional ECG signal generation |
+| Family (`model.name`) | Method |
+|---|---|
+| `vae` | VAE / conditional VAE (spatial or global latent, learned prior) |
+| `pulse2pulse` | Pulse2Pulse WaveGAN (WGAN-GP); conditional and paired lead-reconstruction modes |
+| `vqvae`, `vqvae_prior` | VQ-VAE + PixelCNN prior (conditional, classifier-free guidance) |
+| `diffusion` | DDPM (ε / v / x₀, cosine / linear, min-SNR) with DDIM / ancestral sampling |
+| `flow_matching` | Rectified flow / conditional flow matching with Euler / Heun sampling, optional OT coupling |
+| `latent_diffusion`, `latent_flow_matching` | The same in the latent space of a frozen VAE or VQ-VAE |
 
-The repository also contains a research framework (VAE, two-stage VQ-VAE + PixelCNN prior, Pulse2Pulse) used from a source checkout — see [Research framework](#research-framework) and the [documentation site](https://vajira.info/ECGEN/).
+Backbones for diffusion / flow: `unet1d`, `dit1d` (transformer, AdaLN-Zero),
+`ssm` (SSSD-style S4D), `mamba`. Conditions: class labels and multi-label
+diagnostic statements, tabular / demographic / measurement fields (missing-aware),
+report text (hashed or a frozen Hugging Face encoder), and partial ECGs (any
+lead subset, time spans, forecasting) — with condition dropout, classifier-free
+guidance, and training-free inpainting (replace / RePaint).
+
+```bash
+ecgen train configs/experiments/diffusion_mimic_conditional.yaml
+ecgen sample runs/diffusion_mimic_conditional/seed_42/checkpoints/last.ckpt -n 16 \
+    --cond measurements=800,40,128,170,258,520,60,30,40 --guidance 2 --format csv -o samples/
+ecgen evaluate samples/samples.npy configs/experiments/diffusion_mimic_conditional.yaml
+```
+
+The original Pulse2Pulse generator API (`ecgen.generate`) and the plotting
+helpers below are unchanged.
 
 ---
 
@@ -268,11 +290,19 @@ Edit `configs/upload_checkpoints.yaml` to define which checkpoints map to which 
 
 ```
 src/ecgen/
-├── models/        — VAE and Pulse2Pulse model definitions
-├── data/          — MIMIC-IV-ECG dataset loaders and data modules
-├── training/      — Training loop, losses, metrics, callbacks
-├── f/             — Functional utilities (upload_hf, upload_hf_single)
-└── utils/         — Seeding, I/O, logging helpers
+├── api.py          — ecgen.sample / ecgen.load_model
+├── cli.py          — ecgen train | sample | evaluate | list
+├── registry.py     — FAMILIES, DATASETS, CONDITION_ENCODERS, MASKS, BACKBONES, PROCESSES, CALLBACKS
+├── types.py        — ECGBatch, ConditionOutput
+├── data/           — datasets (MIMIC-IV-ECG, PTB-XL, synthetic), masks, normalizers, ECGDataModule
+├── conditioning/   — field encoders (labels, numeric, text, masked signal), CompositeConditioner
+├── families/       — vae, gan (Pulse2Pulse), vqvae (+ prior), continuous (diffusion, flow, latent)
+├── processes/      — ddpm, rectified_flow
+├── nn/             — blocks, injection layers (FiLM, AdaGN, AdaLN-Zero, cross-attention), backbones
+├── training/       — runner, callbacks, EMA
+├── evaluation/     — measurements, distribution / adherence / reconstruction metrics, classifier
+├── generate.py     — legacy Pulse2Pulse generator; plot.py — ECG plots; f/ — HF upload
+└── models/         — deprecated shims to families/
 ```
 
 ---

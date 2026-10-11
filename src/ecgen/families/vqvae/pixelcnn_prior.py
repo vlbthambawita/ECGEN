@@ -179,9 +179,10 @@ class PixelCNNPrior(nn.Module):
             latent_length: Length of latent sequence
             temperature: Sampling temperature (higher = more random)
             device: Device to generate samples on
-            c, dense: Conditions (see :meth:`forward`); ``dense`` covers all
-                ``latent_length`` positions.
-            c_uncond, dense_uncond: The null conditions, for classifier-free guidance.
+            c: Global condition (see :meth:`forward`).
+            dense: Condition at code resolution, covering all ``latent_length`` positions.
+            c_uncond: Null global condition, for classifier-free guidance.
+            dense_uncond: Null dense condition, for classifier-free guidance.
             guidance: CFG scale ``w``; logits = ``l_u + w (l_c - l_u)``. 1 = no guidance.
 
         Returns:

@@ -238,8 +238,9 @@ class ContinuousGenerativeModule(GenerativeModule):
             n_samples: Number of ECGs.
             seq_length: Length; defaults to the training data's.
             cond: Raw condition values (see :meth:`prepare_condition`).
-            obs, obs_mask: Partially observed ECG and mask (1 = observed). Used by a
-                ``masked_signal`` condition, ``clean_observed`` models, and ``inpaint``.
+            obs: Partially observed ECG. Used by a ``masked_signal`` condition,
+                ``clean_observed`` models, and ``inpaint``.
+            obs_mask: Mask of ``obs`` (1 = observed).
             guidance: Classifier-free guidance scale (default ``config.guidance``).
             steps: Sampling steps (default ``config.sample_steps``).
             inpaint: Training-free inpainting for models without a learned observation

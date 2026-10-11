@@ -27,7 +27,9 @@ ecgen = "ecgen.cli:main"
 hf = ["huggingface_hub>=0.20", "python-dotenv>=1.0"]
 plot = ["cairosvg>=2.5"]
 text = ["transformers>=4.30"]  # pretrained text encoders for report conditioning
-all  = ["huggingface_hub>=0.20", "python-dotenv>=1.0", "cairosvg>=2.5", "transformers>=4.30"]
+ssm  = ["mamba-ssm>=2.0"]      # the mamba backbone (CUDA)
+eval = ["neurokit2>=0.2"]      # heart_rate(method="neurokit")
+all  = ["huggingface_hub>=0.20", "python-dotenv>=1.0", "cairosvg>=2.5", "transformers>=4.30", "neurokit2>=0.2"]
 dev = [
     "pytest",
     "black",

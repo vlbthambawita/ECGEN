@@ -66,7 +66,7 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.da
 
 ## Documentation
 
-MkDocs Material site in `docs/` (config: `mkdocs.yml`; API pages in `docs/api/` are rendered by mkdocstrings from Google-style docstrings). Preview with `pip install -r requirements-docs.txt && mkdocs serve`; CI (`.github/workflows/docs.yml`) runs `mkdocs build --strict` and publishes to the `gh-pages` branch on pushes to `main`/`simple`. New pages must be added to `nav` in `mkdocs.yml`.
+MkDocs Material site in `docs/` (config: `mkdocs.yml`; API pages in `docs/api/` are rendered by mkdocstrings from Google-style docstrings). Preview with `pip install -r requirements-docs.txt && mkdocs serve`; check with `mkdocs build --strict` **without `-q`** (quiet mode hides the warnings that make `--strict` fail; griffe warns on grouped docstring params like `a, b: ...` — give each parameter its own line); CI (`.github/workflows/docs.yml`) runs `mkdocs build --strict` and publishes to the `gh-pages` branch on pushes to `main`/`simple`. New pages must be added to `nav` in `mkdocs.yml`.
 
 ## Published `ecgen` package
 

@@ -24,7 +24,8 @@ class RectifiedFlowProcess(Process):
     """
     Args:
         t_sampling: ``"uniform"`` or ``"logit_normal"`` (Esser et al., 2024).
-        logit_mean, logit_std: Parameters of the logit-normal time distribution.
+        logit_mean: Mean of the logit-normal time distribution.
+        logit_std: Standard deviation of the logit-normal time distribution.
         sigma_min: Width of the conditional path at ``t = 1`` (0 = rectified flow).
         ot_coupling: Pair noise and data within each batch by optimal transport
             (minibatch OT-CFM, Tong et al., 2024) for straighter paths.

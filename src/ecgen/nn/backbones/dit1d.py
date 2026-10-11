@@ -96,7 +96,9 @@ class DiT1d(nn.Module):
         depth: Transformer blocks.
         heads: Attention heads.
         mlp_ratio: MLP width / ``dim``.
-        cond_dim, context_dim, dense_channels: Condition sizes (see ``UNet1d``).
+        cond_dim: Size of the condition vector (0 = none).
+        context_dim: Size of condition tokens (0 = none).
+        dense_channels: Channels of dense conditions (0 = none).
     """
 
     accepts = frozenset({"vector", "tokens", "dense"})

@@ -436,6 +436,26 @@ independently mergeable.
    value better than the unconditional baseline (Phase 7 metric, simple version first).
 
 ### Phase 3 — Diffusion family
+
+> **Status: done.** `ContinuousGenerativeModule` (registered as `diffusion`), the `ddpm`
+> process, the `unet1d` backbone, EMA, CFG, SSSD-style `clean_observed` / `loss_on`, and
+> training-free replace / RePaint inpainting.
+>
+> **Acceptance on synthetic heart-rate conditioning** (4000 records, 40 epochs), requested vs.
+> measured heart rate:
+> - Conditional diffusion: r = 0.67 (MAE 17.4 bpm).
+> - With CFG w = 3: r = 0.86 (MAE 13.4 bpm).
+> - Unconditional baseline: r = 0.14 (MAE 28.7 bpm).
+>
+> **MIMIC lead reconstruction** (only lead I observed → 11 leads; 8000 records, 25 epochs, 64
+> test ECGs):
+> - Mean per-lead Pearson r = 0.48.
+> - MAE 0.525, vs. 0.522 for an all-zeros reconstruction. Stochastic samples are penalised by
+>   pointwise MAE, and the model is under-trained.
+>
+> **Deferred:** the SSSD-ECG reproduction needed PTB-XL (Phase 6). Its config is
+> `ptbxl_sssd_ecg.yaml`; a full training run is not done yet.
+
 1. `ContinuousGenerativeModule` + `DDPMProcess` (ε / v / x₀ prediction, linear / cosine schedules),
    EMA, min-SNR weighting.
 2. `UNet1d` backbone with t-emb, AdaGN, optional attention at low resolution, and input concat for
@@ -447,6 +467,11 @@ independently mergeable.
    12 leads.
 
 ### Phase 4 — Flow matching family
+
+> **Status: done.** `rectified_flow` process; `flow_matching` is the same module with a different
+> default process. No backbone, conditioning, runner or callback changes were needed, which
+> confirms the extensibility claim. Oracle tests show Euler and Heun reach the data exactly.
+
 1. `RectifiedFlowProcess` / conditional flow matching (linear interpolation, logit-normal t),
    optional minibatch-OT coupling.
 2. ODE samplers: Euler, Heun (optional `torchdiffeq` extra). CFG on velocity.
@@ -454,12 +479,32 @@ independently mergeable.
 4. Reuses `UNet1d`, conditioners and callbacks unchanged. This proves the extensibility claim.
 
 ### Phase 5 — Latent generative models and stronger backbones
+
+> **Status: done.**
+> - `latent_diffusion` and `latent_flow_matching` run on a frozen spatial VAE or a VQ-VAE.
+>   The stage-1 model travels in the checkpoint.
+> - New backbones:
+>   - `dit1d`;
+>   - `ssm`: bidirectional S4D, pure PyTorch, checked against the analytic impulse response;
+>   - `mamba`: optional, needs mamba-ssm.
+> - `models/ssm/` and `models/diffusion/` now point at these.
+
 1. `latent` family: diffusion / flow in the latent of a frozen VAE / VQ-VAE (reuse the frozen-checkpoint
    pattern from `PriorLightning`, store the stage-1 config in the checkpoint, latent scale factor).
 2. `DiT1d` (patchified transformer, AdaLN-Zero, cross-attn) and an **SSM** backbone (S4D / Mamba,
    optional extra) so `models/ssm/` stops being a placeholder.
 
 ### Phase 6 — More data and text conditioning
+
+> **Status: done.**
+> - `ptbxl` dataset with the recommended folds (17,441 / 2,193 / 2,203 records). Fields: SCP
+>   vocabularies, demographics, sex, report, and PTB-XL+ 12SL features.
+> - MIMIC `report` text.
+> - `text_hash` and `text` encoders. The frozen Hugging Face model stays out of checkpoints.
+> - The cached `bert-base-uncased` on this machine has no weights, so the `text` encoder is
+>   tested with a tiny local BERT.
+> - Real-data smoke runs pass for `ptbxl_sssd_ecg.yaml` and `diffusion_mimic_reports.yaml`.
+
 1. `ptbxl` dataset (SCP statements → superclass / subclass / multilabel, age, sex, height, weight, folds
    1–10 split as recommended by PTB-XL), optional PTB-XL+ features.
 2. MIMIC machine reports as a text field. `text` encoder (frozen HF model; cache embeddings to disk)
@@ -467,12 +512,47 @@ independently mergeable.
 3. Cross-attention conditioning on text for diffusion / flow / latent.
 
 ### Phase 7 — Evaluation and sampling API
+
+> **Status: done.**
+> - `ecgen.evaluation` covers:
+>   - distribution metrics, on hand-crafted or network features;
+>   - heart-rate and label adherence;
+>   - a TSTR classifier;
+>   - reconstruction metrics;
+>   - inter-lead correlation error;
+>   - Einthoven residual;
+>   - memorisation.
+> - `ecgen.sample`, `ecgen.load_model`, `ecgen sample` and `ecgen evaluate` are in place.
+>   Checkpoints record their family.
+> - `ecgen.generate` is unchanged and tested.
+> - The pretrained-classifier wrapper is a trainable 1D-ResNet (`fit_classifier`); no
+>   pretrained ECG classifier ships with the library.
+
 1. `ecgen.evaluation`: the metrics in §8, with pretrained classifier and delineator wrappers.
 2. Public API: `ecgen.sample(ckpt, n, cond=..., obs=..., obs_mask=..., guidance=..., steps=...)`,
    `ecgen sample` CLI; CSV / WFDB / plot outputs using the existing `ecgen.generate` writers.
 3. Keep `ecgen.generate(...)` for Pulse2Pulse working (backward compatibility test).
 
 ### Phase 8 — Docs, packaging, release
+
+> **Status: done except the release tag.**
+> - Docs: Concepts, Extending, Conditioning, Sampling, Diffusion & flow matching, PTB-XL, and
+>   Visual Guide pages for diffusion and flow matching.
+> - Extras: `text`, `ssm`, `eval`.
+> - The wheel was built and checked. It installs and trains outside the repo, and contains no
+>   top-level research packages.
+>
+> **Deliberately not done:**
+> - The shims are kept. The plan removes them *after one release*, and none has happened
+>   since they were added.
+> - Lightning stays a core dependency (open decision 2), so there is no `ecgen[train]` extra.
+> - Tagging is left to the maintainer. Existing tags go up to v1.0.1, so the next minor is
+>   v1.1.0 rather than v0.x.0. Pushing a tag publishes to PyPI.
+>
+> **Docs CI incident:** the docs CI failed on the Phase 1–7 pushes to `main`. Docstrings
+> grouped parameters (`a, b: …`), which griffe rejects under `--strict`, and local checks had
+> used `-q`, which hides those warnings. Fixed in Phase 8.
+
 1. Docs: "Concepts" (axes and contracts), "Conditioning guide", one page per family, and
    "Extending ECGEN" (below). Visual Guide pages via the `visual-docs` skill for diffusion and flow.
 2. Extras: `ecgen[train]` (lightning, wfdb, sklearn, if we want a slimmer core), `ecgen[text]`,

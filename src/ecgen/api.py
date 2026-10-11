@@ -107,7 +107,8 @@ def sample(
         cond: Raw condition values (numeric fields in raw units; NaN = unknown;
             strings for text fields). A value with a leading dimension of ``n``
             (or a list of ``n`` strings) gives one condition per sample.
-        obs, obs_mask: Partially observed ECGs ``[n, C, T]`` and masks (1 = observed).
+        obs: Partially observed ECGs ``[n, C, T]``.
+        obs_mask: Masks of ``obs`` (1 = observed).
         guidance: Classifier-free guidance scale (conditional diffusion / flow / prior).
         steps: Sampling steps (diffusion / flow).
         seed: Seed for reproducible sampling.

@@ -154,7 +154,8 @@ class VAELightning(GenerativeModule):
             n_samples: Number of ECGs.
             seq_length: Length (multiple of the downsampling factor).
             cond: Raw condition values (see :meth:`prepare_condition`).
-            obs, obs_mask: Partially observed ECG ``[n, C, T]`` and its mask.
+            obs: Partially observed ECG ``[n, C, T]``.
+            obs_mask: Mask of ``obs`` (1 = observed).
             paste_observed: Copy the observed part of ``obs`` into the output.
         """
         self.vae.eval()
