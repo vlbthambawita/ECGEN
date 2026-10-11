@@ -93,8 +93,12 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
 
+extra_css:
+  - stylesheets/architecture.css
+
 extra_javascript:
   - javascripts/mathjax.js
+  - javascripts/architecture.js
   - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
 
 extra:
@@ -116,6 +120,11 @@ nav:
       - VAE: models/vae.md
       - VQ-VAE + Prior: models/vqvae.md
       - Pulse2Pulse GAN: models/gan.md
+  - Visual Guide:
+      - visual/index.md
+      - VAE: visual/vae.md
+      - VQ-VAE + Prior: visual/vqvae.md
+      - Pulse2Pulse GAN: visual/pulse2pulse.md
   - Training:
       - Training Guide: training/guide.md
       - VAE Training: training/vae_training.md
