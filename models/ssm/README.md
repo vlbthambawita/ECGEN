@@ -1,5 +1,10 @@
-# State Space Models (SSM)
+# State Space Models
 
-State Space Models for ECG generation (future implementation).
+State-space backbones live in the `ecgen` package:
 
-This folder is reserved for future SSM implementations (e.g., Mamba, S4).
+- `ecgen.nn.backbones.ssm.S4D` — diagonal state-space layer (S4D), pure PyTorch, FFT convolution
+- `ecgen.nn.backbones.ssm.SSMBackbone` — SSSD-style residual stack of bidirectional S4D layers (registry name `ssm`)
+- `ecgen.nn.backbones.ssm.MambaBackbone` — the same stack with bidirectional Mamba layers (`mamba`, needs `mamba-ssm`)
+
+Use them as the `backbone` of the `diffusion`, `flow_matching` or latent families,
+e.g. `configs/experiments/diffusion_mimic_ssm.yaml`. See docs/models/diffusion.md.

@@ -1,0 +1,48 @@
+# Latent diffusion: DDPM in the latent space of a frozen spatial VAE
+# (train it first with configs/experiments/vae_mimic.yaml). The latent is
+# [8, 625] for 5000-sample ECGs; the checkpoint carries the VAE.
+#   ecgen train configs/experiments/latent_diffusion_mimic.yaml \
+#       model.params.autoencoder_checkpoint=runs/vae_mimic/seed_42/checkpoints/last.ckpt
+# Use name: latent_flow_matching for rectified flow in the same latent space.
+
+experiment: {name: latent_diffusion_mimic, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-latent-diffusion}
+
+model:
+  name: latent_diffusion
+  params:
+    autoencoder_checkpoint: runs/vae_mimic/seed_42/checkpoints/last.ckpt
+    autoencoder_family: vae      # or vqvae (quantized embeddings are the latent)
+    latent_scale: null           # null = 1 / std of the first batch's latents
+    process: {name: ddpm, params: {schedule: cosine, prediction: v}}
+    backbone:
+      name: dit1d
+      params: {patch_size: 5, dim: 384, depth: 12, heads: 6}
+    conditioning:
+      vector_dim: 384
+      encoders:
+        - {field: measurements, name: fourier, params: {num_features: 9, dim: 384}}
+      dropout: {measurements: 0.15}
+    lr: 0.0001
+    warmup_steps: 1000
+    ema_decay: 0.9995
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params: {root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0, max_samples: 50000, leads: null, scale: zscore, missing: mask}   # leads/scale must match the VAE
+  split_params: {val: {max_samples: 1000}}
+  batch_size: 64
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 200
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

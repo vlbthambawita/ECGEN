@@ -1,4 +1,4 @@
-"""Continuous-time generative families: diffusion (and flow matching, same module)."""
+"""Continuous-time generative families: diffusion and flow matching, in signal or latent space."""
 
 from ecgen.families.continuous.module import (
     ContinuousConfig,
@@ -7,8 +7,18 @@ from ecgen.families.continuous.module import (
     FlowMatchingConfig,
     FlowMatchingModule,
 )
+from ecgen.families.continuous.latent import (
+    LatentConfig,
+    LatentContinuousModule,
+    LatentDiffusionModule,
+    LatentFlowMatchingModule,
+)
 
 __all__ = [
+    "LatentConfig",
+    "LatentContinuousModule",
+    "LatentDiffusionModule",
+    "LatentFlowMatchingModule",
     "ContinuousConfig",
     "ContinuousGenerativeModule",
     "DiffusionModule",

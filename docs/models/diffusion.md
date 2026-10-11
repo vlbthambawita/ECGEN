@@ -66,6 +66,36 @@ four levels).
 | `heads` | `4` |
 | `dropout` | `0.0` |
 
+## Other backbones
+
+| Name | Idea | Condition slots | Notes |
+|---|---|---|---|
+| `unet1d` | Convolutional U-Net (above) | vector, tokens, dense | Default; length divisible by `2^(levels-1)` |
+| `dit1d` | Transformer over patches of `patch_size` samples, AdaLN-Zero modulation, cross-attention in every block (Peebles & Xie, 2023) | vector, tokens, dense | Length divisible by `patch_size`; good for latents (e.g. 625 / 5 = 125 tokens) |
+| `ssm` | SSSD-style stack of bidirectional S4D state-space layers at full resolution (Alcaraz & Strodthoff, 2023; Gu et al., 2022), pure PyTorch | vector, dense | Global receptive field via FFT convolution |
+| `mamba` | `ssm` with bidirectional Mamba layers (Gu & Dao, 2023) | vector, dense | Needs `mamba-ssm` (CUDA) |
+
+`dit1d`: `patch_size` (25), `dim` (256), `depth` (8), `heads` (8), `mlp_ratio` (4).
+`ssm` / `mamba`: `channels` (128), `depth` (8), `state_size` (64 / 16), `bidirectional` (true), `dropout`.
+
+## Latent diffusion and flow matching
+
+`latent_diffusion` and `latent_flow_matching` run the same processes in the
+latent space of a frozen stage-1 autoencoder (Rombach et al., 2022):
+
+- `autoencoder_family: vae` — a spatial, unconditional `vae`; the posterior mean is the latent
+  (`[latent_channels, T / 8]`);
+- `autoencoder_family: vqvae` — the quantized embeddings are the latent; sampled latents are
+  snapped to the codebook before decoding.
+
+The stage-1 config is stored in the checkpoint (`autoencoder_config`) and its
+weights in the state dict, so the stage-1 file is not needed after training
+(the same pattern as the PixelCNN prior). Latents are multiplied by
+`latent_scale` (default: `1 / std` of the first training batch, then fixed and
+saved). Dense conditions are pooled to the latent length; `loss_on`,
+`clean_observed` and training-free inpainting are signal-space options and are
+rejected. Example: `configs/experiments/latent_diffusion_mimic.yaml`.
+
 ## Module options (`ContinuousConfig`)
 
 | Field | Default | Meaning |
@@ -101,6 +131,8 @@ the output unless `paste_observed=False`.
 - `configs/experiments/diffusion_mimic_conditional.yaml` — conditioned on the machine measurements, CFG
 - `configs/experiments/diffusion_mimic_leads.yaml` — lead reconstruction / imputation
 - `configs/experiments/flow_matching_mimic.yaml` — conditional flow matching
+- `configs/experiments/diffusion_mimic_ssm.yaml` — SSSD-style S4D backbone
+- `configs/experiments/latent_diffusion_mimic.yaml` — latent diffusion with a DiT backbone
 
 Evaluate lead reconstruction with
 `python scripts/evaluate/lead_reconstruction.py <ckpt> --family diffusion --keep I`

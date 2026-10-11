@@ -105,7 +105,7 @@ class ContinuousGenerativeModule(GenerativeModule):
                 )
         self.process = PROCESSES.build(config.process)
         self.backbone = BACKBONES.build(
-            config.backbone, in_channels=config.in_channels, **sizes
+            config.backbone, in_channels=self._model_channels(config), **sizes
         )
         self.ema = (
             EMA([self.backbone, self.conditioner], config.ema_decay)
@@ -113,12 +113,41 @@ class ContinuousGenerativeModule(GenerativeModule):
             else None
         )
 
+    # ------------------------------------------------- model space (hooks)
+
+    def _model_channels(self, config: ContinuousConfig) -> int:
+        """Channels of the space the process runs in (latent subclasses override)."""
+        return config.in_channels
+
+    def to_model_space(self, x: Tensor) -> Tensor:
+        """Signal ``[B, C, T]`` → the space the process runs in (identity here)."""
+        return x
+
+    def from_model_space(self, z: Tensor) -> Tensor:
+        """Inverse of :meth:`to_model_space`."""
+        return z
+
+    def model_space_shape(self, n: int, seq_length: int) -> tuple[int, ...]:
+        return (n, self.config.in_channels, seq_length)
+
+    def adapt_condition(
+        self, c: Optional[ConditionOutput], length: int
+    ) -> Optional[ConditionOutput]:
+        """Resample dense conditions to the model-space length."""
+        if c is None or c.dense is None or c.dense.shape[-1] == length:
+            return c
+        dense = torch.nn.functional.adaptive_avg_pool1d(c.dense, length)
+        return ConditionOutput(c.vector, c.tokens, c.tokens_mask, dense)
+
     # ------------------------------------------------------------- training
 
     def _loss(self, batch: Any) -> Tensor:
-        x0 = self.get_signal(batch)
-        cond = self.condition(batch)
+        signal = self.get_signal(batch)
+        x0 = self.to_model_space(signal)
+        cond = self.adapt_condition(self.condition(batch), x0.shape[-1])
         obs_mask = getattr(batch, "obs_mask", None)
+        if x0.shape != signal.shape:
+            obs_mask = None  # masks live in signal space
         pair = self.process.training_pair(x0, torch.randn_like(x0))
         xt = pair.xt
         if self.config.clean_observed and obs_mask is not None:
@@ -181,7 +210,8 @@ class ContinuousGenerativeModule(GenerativeModule):
 
     # ------------------------------------------------------------- sampling
 
-    def _model_fn(self, c: Optional[ConditionOutput]):
+    def _model_fn(self, c: Optional[ConditionOutput], length: int):
+        c = self.adapt_condition(c, length)
         return lambda x, t: self.backbone(x, t, c)
 
     @torch.no_grad()
@@ -240,6 +270,10 @@ class ContinuousGenerativeModule(GenerativeModule):
                 else obs_mask.to(self.device, obs.dtype)
             )
 
+        shape = self.model_space_shape(n_samples, seq_length)
+        latent = shape[1:] != (self.config.in_channels, seq_length)
+        if latent and (inpaint is not None or self.config.clean_observed):
+            raise ValueError("Training-free inpainting works in signal space only")
         inpainting = None
         if inpaint is not None:
             if obs is None:
@@ -263,17 +297,18 @@ class ContinuousGenerativeModule(GenerativeModule):
             uncond_fn = None
             if c is not None and guidance != 1.0:
                 u = self.encode_condition(n_samples, cond, c_obs, c_mask, drop="all")
-                uncond_fn = self._model_fn(u)
-            model_fn = cfg_model_fn(self._model_fn(c), uncond_fn, guidance)
+                uncond_fn = self._model_fn(u, shape[-1])
+            model_fn = cfg_model_fn(self._model_fn(c, shape[-1]), uncond_fn, guidance)
             x = self.process.sample(
                 model_fn,
-                (n_samples, self.config.in_channels, seq_length),
+                shape,
                 steps=steps,
                 device=self.device,
                 generator=generator,
                 inpaint=inpainting,
                 **process_kwargs,
             )
+            x = self.from_model_space(x)
         if paste_observed and obs is not None:
             x = obs_mask * obs + (1 - obs_mask) * x
         return x

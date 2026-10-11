@@ -1,0 +1,43 @@
+# SSSD-style diffusion: DDPM with a bidirectional S4D state-space backbone at
+# full resolution (Alcaraz & Strodthoff, 2023), conditioned on the measurements.
+# backbone.name: mamba swaps in bidirectional Mamba layers (needs mamba-ssm, CUDA).
+#   ecgen train configs/experiments/diffusion_mimic_ssm.yaml
+
+experiment: {name: diffusion_mimic_ssm, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-diffusion}
+
+model:
+  name: diffusion
+  params:
+    in_channels: 12
+    process: {name: ddpm, params: {num_steps: 200, schedule: linear, prediction: eps}}
+    backbone: {name: ssm, params: {channels: 256, depth: 24, state_size: 64, bidirectional: true}}
+    conditioning:
+      vector_dim: 256
+      encoders:
+        - {field: measurements, name: fourier, params: {num_features: 9, dim: 256}}
+      dropout: {measurements: 0.15}
+    lr: 0.0002
+    warmup_steps: 1000
+    ema_decay: 0.9995
+    sample_steps: 200
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params: {root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0, max_samples: 50000, leads: standard12, scale: zscore, missing: mask}
+  split_params: {val: {max_samples: 1000}}
+  batch_size: 16
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

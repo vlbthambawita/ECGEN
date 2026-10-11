@@ -62,6 +62,8 @@ Auto-generated from docstrings.
 
 ::: ecgen.families.continuous.module
 
+::: ecgen.families.continuous.latent
+
 ## `ecgen.processes`
 
 ::: ecgen.processes.base
@@ -70,9 +72,13 @@ Auto-generated from docstrings.
 
 ::: ecgen.processes.flow
 
-## `ecgen.nn.backbones.unet1d`
+## `ecgen.nn.backbones`
 
 ::: ecgen.nn.backbones.unet1d
+
+::: ecgen.nn.backbones.dit1d
+
+::: ecgen.nn.backbones.ssm
 
 ## `ecgen.training.ema`
 
