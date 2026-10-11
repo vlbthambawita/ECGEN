@@ -453,6 +453,10 @@ independently mergeable.
 > - MAE 0.525, vs. 0.522 for an all-zeros reconstruction. Stochastic samples are penalised by
 >   pointwise MAE, and the model is under-trained.
 >
+> **Training-free comparison:** an unconditional diffusion model with RePaint (jumps 5, 50
+> steps) reaches per-lead r = 0.22 (MAE 0.70). Learned observation conditioning clearly beats
+> training-free inpainting here.
+>
 > **Deferred:** the SSSD-ECG reproduction needed PTB-XL (Phase 6). Its config is
 > `ptbxl_sssd_ecg.yaml`; a full training run is not done yet.
 
@@ -471,6 +475,18 @@ independently mergeable.
 > **Status: done.** `rectified_flow` process; `flow_matching` is the same module with a different
 > default process. No backbone, conditioning, runner or callback changes were needed, which
 > confirms the extensibility claim. Oracle tests show Euler and Heun reach the data exactly.
+>
+> **Acceptance:** synthetic heart-rate conditioning, same data and U-Net as Phase 3, 40 epochs.
+>
+> | Model | Sampler | Network calls | r | MAE (bpm) |
+> |---|---|---|---|---|
+> | Flow matching, CFG w = 3 | 10 Heun steps | 19 | 0.89 | 16.0 |
+> | Flow matching, CFG w = 3 | 25 Heun steps | 49 | 0.87 | 16.0 |
+> | Flow matching, no guidance | 25 Heun steps | 49 | 0.71 | 19.8 |
+> | Diffusion, CFG w = 3 | 10 DDIM steps | 20 | 0.74 | 18.4 |
+> | Diffusion, CFG w = 3 | 50 DDIM steps | 100 | 0.86 | 13.4 |
+>
+> Flow matching keeps its adherence at very few steps.
 
 1. `RectifiedFlowProcess` / conditional flow matching (linear interpolation, logit-normal t),
    optional minibatch-OT coupling.
@@ -504,6 +520,15 @@ independently mergeable.
 > - The cached `bert-base-uncased` on this machine has no weights, so the `text` encoder is
 >   tested with a tiny local BERT.
 > - Real-data smoke runs pass for `ptbxl_sssd_ecg.yaml` and `diffusion_mimic_reports.yaml`.
+>
+> **Acceptance:** text-conditioned diffusion on synthetic reports (`text_hash` tokens →
+> cross-attention, 40 epochs). Median heart rate of 32 samples per prompt:
+>
+> | Prompt | Median HR, w = 1 | Median HR, w = 3 | Share > 100 bpm, w = 3 |
+> |---|---|---|---|
+> | "sinus bradycardia" | 68 | 61 | 0% |
+> | "sinus rhythm" | 87 | 74 | 6% |
+> | "sinus tachycardia" | 110 | 133 | 97% |
 
 1. `ptbxl` dataset (SCP statements → superclass / subclass / multilabel, age, sex, height, weight, folds
    1–10 split as recommended by PTB-XL), optional PTB-XL+ features.

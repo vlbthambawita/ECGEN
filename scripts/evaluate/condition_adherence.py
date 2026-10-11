@@ -48,6 +48,7 @@ def main() -> None:
     p.add_argument("--n", type=int, default=16, help="samples per rate")
     p.add_argument("--seq-length", type=int, default=5000)
     p.add_argument("--guidance", type=float, default=1.0)
+    p.add_argument("--steps", type=int, help="sampling steps (diffusion / flow)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = p.parse_args()
@@ -67,6 +68,8 @@ def main() -> None:
         kwargs = {"seq_length": args.seq_length} if args.family != "pulse2pulse" else {}
         if args.guidance != 1.0:
             kwargs["guidance"] = args.guidance
+        if args.steps:
+            kwargs["steps"] = args.steps
         if model.is_conditional:
             columns = model.data_info["normalizers"][args.field]["columns"]
             value = {c: float(fixed.get(c, "nan")) for c in columns}
