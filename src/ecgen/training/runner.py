@@ -203,8 +203,22 @@ def _model_io(model: pl.LightningModule) -> Dict[str, Optional[int]]:
 
 
 def check_compatibility(model: pl.LightningModule, datamodule: ECGDataModule) -> None:
-    """Fail early if the model and dataset disagree on leads or length."""
+    """Fail early if the model and dataset disagree on leads, length, or conditions."""
     ds = datamodule.reference_dataset
+    conditioner = getattr(model, "conditioner", None)
+    if conditioner is not None:
+        sample = ds[0]
+        available = set(sample.get("cond", {}))
+        missing = [f for f in conditioner.cond_fields if f not in available]
+        if missing:
+            raise ValueError(
+                f"Conditioning uses fields {missing} that the dataset does not provide "
+                f"(it provides {sorted(available)})"
+            )
+        if conditioner.uses_obs and datamodule.mask_spec is None:
+            raise ValueError(
+                "Conditioning reads the observed ECG ('obs' field) but data.masks is not set"
+            )
     io = _model_io(model)
     if io["channels"] is not None and io["channels"] != ds.num_leads:
         raise ValueError(
@@ -267,6 +281,8 @@ def train(
     datamodule = build_datamodule(cfg["data"])
     datamodule.setup("fit")
     check_compatibility(model, datamodule)
+    if hasattr(model, "set_data_info"):
+        model.set_data_info(datamodule.state_dict())
 
     for d in (paths.checkpoints, paths.samples, paths.metrics):
         d.mkdir(parents=True, exist_ok=True)

@@ -368,6 +368,18 @@ independently mergeable.
    with identical loss curves on a fixed seed.
 
 ### Phase 1 — Conditioning core
+
+> **Status: done.** The `ConditionOutput` slots work as designed. Implementation notes:
+> - The numeric encoder is registered as `numeric`, not `numeric_mlp`.
+> - The data side gained two pieces: a `field_normalizers` property on datasets, and
+>   `ECGDataModule(masks=...)`.
+> - `GenerativeModule` gained the conditioning plumbing (`init_conditioning`, `condition`,
+>   `encode_condition`, `prepare_condition`) and `data_info` checkpointing.
+> - The synthetic dataset now carries ground-truth `measurements`, `rhythm` and `labels`, with
+>   `scale: none` by default.
+> - A test-only toy conditional family exercises the round trip from runner to checkpoint to
+>   `sample(cond=raw)`.
+
 1. `conditioning/encoders`: `categorical`, `multilabel`, `numeric_mlp` (missing-aware),
    `fourier_scalar`, `masked_signal`. Add `CompositeConditioner` and `ConditionDropout` (learned null
    embeddings).

@@ -127,6 +127,7 @@ nav:
       - Pulse2Pulse GAN: visual/pulse2pulse.md
   - Training:
       - Training with ecgen train: training/runner.md
+      - Conditioning: training/conditioning.md
       - Training Guide: training/guide.md
       - VAE Training: training/vae_training.md
       - VQ-VAE Training: training/vqvae_training.md
@@ -140,6 +141,7 @@ nav:
   - API Reference:
       - Models: api/models.md
       - Data: api/data.md
+      - Conditioning: api/conditioning.md
       - Training: api/training.md
       - Evaluation: api/evaluation.md
       - Visualization: api/visualization.md

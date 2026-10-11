@@ -324,6 +324,7 @@ class Pulse2PulseGAN(GenerativeModule):
         return self.netG(noise)
 
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        super().on_load_checkpoint(checkpoint)
         # netD.fc1 is created lazily on the first forward pass; create it at the
         # saved size so the checkpoint's weights can be loaded into it.
         fc_weight = checkpoint.get("state_dict", {}).get("netD.fc1.weight")

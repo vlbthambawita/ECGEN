@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from ecgen.data.collate import ECGCollate
 from ecgen.data.datasets.base import BaseECGDataset
+from ecgen.data.masks import build_mask
 from ecgen.registry import DATASETS
 
 
@@ -28,6 +29,8 @@ class ECGDataModule(pl.LightningDataModule):
         pin_memory: Defaults to ``torch.cuda.is_available()``.
         split_params: Per-split overrides of ``dataset.params``, e.g.
             ``{"val": {"max_samples": 1000}}``.
+        masks: Observation-mask spec (see :mod:`ecgen.data.masks`); adds
+            ``obs_mask`` to every batch for partial-ECG conditioning.
 
     The train split's ``feature_normalizer`` (if any) is passed to the val/test
     datasets that accept one, and saved in checkpoints via :meth:`state_dict`.
@@ -40,6 +43,7 @@ class ECGDataModule(pl.LightningDataModule):
         num_workers: int = 4,
         pin_memory: Optional[bool] = None,
         split_params: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        masks: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__()
         self.dataset_spec = dict(dataset)
@@ -49,6 +53,7 @@ class ECGDataModule(pl.LightningDataModule):
             torch.cuda.is_available() if pin_memory is None else pin_memory
         )
         self.split_params = {k: dict(v) for k, v in (split_params or {}).items()}
+        self.mask_spec = dict(masks) if masks else None
 
         self.datasets: Dict[str, BaseECGDataset] = {}
 
@@ -96,7 +101,9 @@ class ECGDataModule(pl.LightningDataModule):
             shuffle=shuffle,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            collate_fn=ECGCollate(ds.lead_names, ds.fs),
+            collate_fn=ECGCollate(
+                ds.lead_names, ds.fs, build_mask(self.mask_spec, ds.lead_names)
+            ),
         )
 
     def train_dataloader(self) -> DataLoader:
@@ -120,10 +127,12 @@ class ECGDataModule(pl.LightningDataModule):
         if not self.datasets:
             return {}
         ds = self.reference_dataset
-        norm = getattr(self.datasets.get("train", ds), "feature_normalizer", None)
+        train = self.datasets.get("train", ds)
+        norm = getattr(train, "feature_normalizer", None)
         return {
             "lead_names": list(ds.lead_names),
             "fs": ds.fs,
             "seq_length": ds.seq_length,
             "feature_normalizer": norm.to_dict() if norm is not None else None,
+            "normalizers": {f: n.to_dict() for f, n in train.field_normalizers.items()},
         }

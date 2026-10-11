@@ -62,3 +62,14 @@ class BaseECGDataset(Dataset, ABC):
     @property
     def num_leads(self) -> int:
         return len(self.lead_names)
+
+    @property
+    def field_normalizers(self) -> Dict[str, FeatureNormalizer]:
+        """Normalizers of numeric ``cond`` fields, by field name.
+
+        Saved in checkpoints so a model can normalize raw values at sampling
+        time. Default: :attr:`feature_normalizer` for the ``measurements`` field.
+        """
+        if self.feature_normalizer is None or not self.feature_normalizer.columns:
+            return {}
+        return {"measurements": self.feature_normalizer}

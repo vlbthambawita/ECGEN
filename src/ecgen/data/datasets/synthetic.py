@@ -11,6 +11,7 @@ import torch
 
 from ecgen.data.datasets.base import BaseECGDataset, Scale, scale_signal
 from ecgen.data.leads import LeadSpec, resolve_leads, STANDARD_12
+from ecgen.data.normalizers import FeatureNormalizer
 from ecgen.registry import DATASETS
 
 _SPLIT_OFFSET = {"train": 0, "val": 1_000_000, "test": 2_000_000}
@@ -21,9 +22,13 @@ class SyntheticECG(BaseECGDataset):
     """
     Deterministic periodic "beats" with per-record heart rate and amplitude.
 
-    ``cond["measurements"]`` holds the normalized ``[heart_rate, amplitude]``
-    that produced each record, so conditional models can be smoke-tested
-    against a known ground truth.
+    Every record carries the ground truth that produced it, so conditional
+    models can be tested against known targets:
+
+    - ``cond["measurements"]``: ``[heart_rate (bpm), amplitude (mV)]``, normalized
+      with :attr:`feature_normalizer` (fixed statistics of the sampling ranges);
+    - ``cond["rhythm"]``: class 0 = brady (< 60 bpm), 1 = normal, 2 = tachy (> 100 bpm);
+    - ``cond["labels"]``: multi-hot ``[brady, tachy, high_amplitude (> 1.25 mV)]``.
 
     Args:
         split: ``"train"``, ``"val"``, or ``"test"`` (different records per split).
@@ -31,12 +36,16 @@ class SyntheticECG(BaseECGDataset):
         leads: Lead spec (see :func:`ecgen.data.leads.resolve_leads`); default all 12.
         seq_length: Samples per record.
         fs: Sampling rate in Hz.
-        scale: As in :func:`ecgen.data.datasets.base.scale_signal`.
+        scale: As in :func:`ecgen.data.datasets.base.scale_signal`; default ``"none"``
+            keeps the amplitude, which ``"zscore"`` would normalize away.
         seed: Base seed; record ``i`` of a split is always the same signal.
     """
 
     HR_RANGE = (45.0, 150.0)
     AMP_RANGE = (0.5, 2.0)
+    MEASUREMENTS = ("heart_rate", "amplitude")
+    RHYTHMS = ("brady", "normal", "tachy")
+    LABELS = ("brady", "tachy", "high_amplitude")
 
     def __init__(
         self,
@@ -45,7 +54,7 @@ class SyntheticECG(BaseECGDataset):
         leads: LeadSpec = None,
         seq_length: int = 5000,
         fs: int = 500,
-        scale: Scale = "zscore",
+        scale: Scale = "none",
         seed: int = 0,
     ) -> None:
         if split not in _SPLIT_OFFSET:
@@ -57,33 +66,51 @@ class SyntheticECG(BaseECGDataset):
         self.fs = fs
         self.scale = scale
         self.seed = seed
+        ranges = (self.HR_RANGE, self.AMP_RANGE)
+        self.feature_normalizer = FeatureNormalizer(
+            columns=list(self.MEASUREMENTS),
+            mean={c: float(np.mean(r)) for c, r in zip(self.MEASUREMENTS, ranges)},
+            std={
+                c: float(np.ptp(r) / np.sqrt(12))
+                for c, r in zip(self.MEASUREMENTS, ranges)
+            },
+        )
 
     def __len__(self) -> int:
         return self.num_samples
+
+    @classmethod
+    def render(
+        cls, hr: float, amp: float, num_leads: int, seq_length: int, fs: int, rng
+    ) -> np.ndarray:
+        """The ``[C, T]`` signal for a heart rate (bpm) and amplitude (mV)."""
+        t = np.arange(seq_length) / fs
+        phase = (t * hr / 60.0 + rng.uniform()) % 1.0
+        beat = amp * np.exp(-((phase - 0.3) ** 2) / 2e-4) + 0.2 * amp * np.exp(
+            -((phase - 0.6) ** 2) / 4e-3
+        )
+        gains = rng.uniform(0.5, 1.0, size=(num_leads, 1)) * rng.choice(
+            [-1.0, 1.0], size=(num_leads, 1)
+        )
+        noise = 0.02 * rng.standard_normal((num_leads, seq_length))
+        return (gains * beat[None, :] + noise).astype(np.float32)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         rng = np.random.default_rng(self.seed + _SPLIT_OFFSET[self.split] + idx)
         hr = rng.uniform(*self.HR_RANGE)
         amp = rng.uniform(*self.AMP_RANGE)
+        ecg = self.render(hr, amp, len(self.lead_names), self.seq_length, self.fs, rng)
 
-        t = np.arange(self.seq_length) / self.fs
-        phase = (t * hr / 60.0 + rng.uniform()) % 1.0
-        beat = amp * np.exp(-((phase - 0.3) ** 2) / 2e-4) + 0.2 * amp * np.exp(
-            -((phase - 0.6) ** 2) / 4e-3
-        )
-        gains = rng.uniform(-1.0, 1.0, size=(len(self.lead_names), 1))
-        noise = 0.02 * rng.standard_normal((len(self.lead_names), self.seq_length))
-        ecg = (gains * beat[None, :] + noise).astype(np.float32)
-
-        hr_mid, hr_half = np.mean(self.HR_RANGE), np.ptp(self.HR_RANGE) / 2
-        amp_mid, amp_half = np.mean(self.AMP_RANGE), np.ptp(self.AMP_RANGE) / 2
-        features = np.array(
-            [(hr - hr_mid) / hr_half, (amp - amp_mid) / amp_half], dtype=np.float32
-        )
-
+        features, missing = self.feature_normalizer.transform([hr, amp])
+        rhythm = 0 if hr < 60 else (2 if hr > 100 else 1)
+        labels = np.array([hr < 60, hr > 100, amp > 1.25], dtype=np.float32)
         return {
             "signal": torch.from_numpy(scale_signal(ecg, self.scale)),
-            "cond": {"measurements": torch.from_numpy(features)},
-            "cond_missing": {"measurements": torch.zeros(2, dtype=torch.bool)},
-            "meta": {"index": idx},
+            "cond": {
+                "measurements": torch.from_numpy(features),
+                "rhythm": torch.tensor(rhythm, dtype=torch.long),
+                "labels": torch.from_numpy(labels),
+            },
+            "cond_missing": {"measurements": torch.from_numpy(missing)},
+            "meta": {"index": idx, "heart_rate": float(hr), "amplitude": float(amp)},
         }

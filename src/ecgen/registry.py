@@ -99,10 +99,14 @@ class Registry(Generic[T]):
 DATASETS: Registry[Any] = Registry("dataset")
 FAMILIES: Registry[Any] = Registry("family")
 CALLBACKS: Registry[Any] = Registry("callback")
+CONDITION_ENCODERS: Registry[Any] = Registry("condition encoder")
+MASKS: Registry[Any] = Registry("mask generator")
 
 
 def load_builtins() -> None:
     """Import the built-in modules so their ``@register`` decorators run."""
+    import ecgen.conditioning  # noqa: F401
     import ecgen.data.datasets  # noqa: F401
+    import ecgen.data.masks  # noqa: F401
     import ecgen.families  # noqa: F401
     import ecgen.training.callbacks  # noqa: F401
