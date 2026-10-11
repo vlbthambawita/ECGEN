@@ -240,6 +240,8 @@ def test_shipped_experiment_configs_resolve(name):
         yaml.safe_load((repo / "configs" / "experiments" / f"{name}.yaml").read_text())
     )
     assert cfg["data"]["dataset"]["name"] in DATASETS
+    if any(e.get("name") == "text" for e in ((cfg["model"].get("params") or {}).get("conditioning") or {}).get("encoders", [])):
+        return  # needs a downloaded Hugging Face model
     # Build the model too (catches bad params), except priors that need a stage-1 file
     if "vqvae_checkpoint" not in cfg["model"].get("params", {}):
         assert build_model(cfg["model"]) is not None

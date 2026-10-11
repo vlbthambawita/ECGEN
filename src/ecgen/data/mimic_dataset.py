@@ -76,6 +76,7 @@ class MIMICIVECGDataset(Dataset):
             self.filter_missing_files()
         else:
             import warnings
+
             warnings.warn(
                 "Skipping missing file check. Some samples may fail during loading.",
                 UserWarning,
@@ -83,7 +84,9 @@ class MIMICIVECGDataset(Dataset):
             )
 
         if max_samples is not None:
-            self.measurements = self.measurements.head(max_samples).reset_index(drop=True)
+            self.measurements = self.measurements.head(max_samples).reset_index(
+                drop=True
+            )
 
         self.compute_feature_stats()
 
@@ -101,7 +104,9 @@ class MIMICIVECGDataset(Dataset):
         if missing:
             raise ValueError(f"machine_measurements.csv missing columns: {missing}")
 
-        self.measurements = self.measurements.dropna(subset=self.FEATURE_NAMES).reset_index(drop=True)
+        self.measurements = self.measurements.dropna(
+            subset=self.FEATURE_NAMES
+        ).reset_index(drop=True)
 
     def create_splits(self, val_split: float, test_split: float) -> None:
         subjects = self.measurements["subject_id"].unique()
@@ -174,13 +179,17 @@ class MIMICIVECGDataset(Dataset):
         signal = signal.T.astype(np.float32)  # (leads, time)
 
         if signal.shape[0] < self.num_leads:
-            pad = np.zeros((self.num_leads - signal.shape[0], signal.shape[1]), dtype=np.float32)
+            pad = np.zeros(
+                (self.num_leads - signal.shape[0], signal.shape[1]), dtype=np.float32
+            )
             signal = np.vstack([signal, pad])
         elif signal.shape[0] > self.num_leads:
             signal = signal[: self.num_leads]
 
         if signal.shape[1] < self.seq_length:
-            pad = np.zeros((signal.shape[0], self.seq_length - signal.shape[1]), dtype=np.float32)
+            pad = np.zeros(
+                (signal.shape[0], self.seq_length - signal.shape[1]), dtype=np.float32
+            )
             signal = np.hstack([signal, pad])
         elif signal.shape[1] > self.seq_length:
             signal = signal[:, : self.seq_length]

@@ -12,6 +12,13 @@ from ecgen.data.masks import MaskGenerator
 from ecgen.types import ECGBatch
 
 
+def _stack(values: List[Any]) -> Any:
+    """Stack tensors; keep anything else (e.g. report strings) as a list."""
+    if isinstance(values[0], torch.Tensor):
+        return torch.stack(values)
+    return list(values)
+
+
 class ECGCollate:
     """
     ``collate_fn`` that stacks dict samples into an :class:`ECGBatch`.
@@ -39,8 +46,7 @@ class ECGCollate:
                     s["obs_mask"] = self.mask_generator(c, t)
         first = samples[0]
         cond = {
-            k: torch.stack([s["cond"][k] for s in samples])
-            for k in first.get("cond", {})
+            k: _stack([s["cond"][k] for s in samples]) for k in first.get("cond", {})
         }
         cond_missing = {
             k: torch.stack([s["cond_missing"][k] for s in samples])

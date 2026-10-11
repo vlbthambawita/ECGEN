@@ -237,7 +237,8 @@ def _infer_device(
     # Not next(module.parameters()): an encoder set may have no parameters, and a
     # StopIteration inside a Lightning step silently ends the epoch.
     for v in cond.values():
-        return v.device
+        if isinstance(v, Tensor):
+            return v.device
     if obs is not None:
         return obs.device
     for p in module.parameters():
@@ -247,7 +248,7 @@ def _infer_device(
 
 def _infer_batch(cond: Mapping[str, Tensor], obs: Optional[Tensor]) -> int:
     for v in cond.values():
-        return v.shape[0]
+        return v.shape[0] if isinstance(v, Tensor) else len(v)
     if obs is not None:
         return obs.shape[0]
     raise ValueError("Cannot infer batch size: no condition given; pass batch_size=")

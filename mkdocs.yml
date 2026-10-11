@@ -114,6 +114,7 @@ nav:
       - Configuration: getting_started/configuration.md
   - Datasets:
       - MIMIC-IV-ECG: datasets/mimic.md
+      - PTB-XL: datasets/ptbxl.md
       - Adding a Dataset: datasets/custom.md
   - Models:
       - Architecture Overview: models/architecture.md

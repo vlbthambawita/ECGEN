@@ -1,0 +1,51 @@
+# SSSD-ECG-style reproduction target (Alcaraz & Strodthoff, 2023): diffusion with a
+# bidirectional S4D backbone on PTB-XL at 100 Hz, 8 independent leads, conditioned
+# on all 71 SCP statements (multi-hot, linear projection), recommended folds.
+#   ecgen train configs/experiments/ptbxl_sssd_ecg.yaml
+# Sample: .sample(n, cond={"scp": multi_hot_71}, guidance=1.0)
+
+experiment: {name: ptbxl_sssd_ecg, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-ptbxl}
+
+model:
+  name: diffusion
+  params:
+    in_channels: 8
+    process: {name: ddpm, params: {num_steps: 200, schedule: linear, prediction: eps, min_snr_gamma: null}}
+    backbone: {name: ssm, params: {channels: 256, depth: 36, state_size: 64, bidirectional: true}}
+    conditioning:
+      vector_dim: 256
+      encoders:
+        - {field: scp, name: multilabel, params: {num_labels: 71, dim: 256}}
+      dropout: {scp: 0.1}
+    lr: 0.0002
+    warmup_steps: 1000
+    ema_decay: 0.9995
+    sample_steps: 200
+
+data:
+  dataset:
+    name: ptbxl
+    params:
+      root: /work/vajira/DATA/EXG_PTB_XL/physionet/files/ptb-xl/1_0_1
+      sampling_rate: 100
+      leads: independent8
+      scale: zscore
+      labels: all
+      demographics: false
+      sex: false
+      report: false
+  batch_size: 32
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 200
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

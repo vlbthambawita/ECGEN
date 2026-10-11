@@ -87,6 +87,7 @@ class MIMICIVECG(BaseECGDataset):
             ``"mask"`` keeps more subjects, so its split differs from ``"drop"``.
         feature_normalizer: Use these statistics instead of fitting on train
             (e.g. those stored in a checkpoint).
+        report: Add ``cond["report"]``: the machine report lines joined by ". ".
     """
 
     fs = 500
@@ -108,6 +109,7 @@ class MIMICIVECG(BaseECGDataset):
         measurements: Optional[Sequence[str]] = None,
         missing: str = "drop",
         feature_normalizer: Optional[FeatureNormalizer | Dict[str, Any]] = None,
+        report: bool = False,
     ) -> None:
         if split not in ("train", "val", "test"):
             raise ValueError(f"split must be train/val/test, got {split!r}")
@@ -120,6 +122,7 @@ class MIMICIVECG(BaseECGDataset):
         self.seq_length = seq_length
         self.scale = scale
         self.ecg_norm_eps = ecg_norm_eps
+        self.use_report = report
         self.measurement_columns: List[str] = list(
             MEASUREMENT_COLUMNS if measurements is None else measurements
         )
@@ -268,6 +271,11 @@ class MIMICIVECG(BaseECGDataset):
                 "study_id": int(row["study_id"]),
             },
         }
+        if self.use_report:
+            lines = [row.get(f"report_{i}") for i in range(18)]
+            sample["cond"]["report"] = ". ".join(
+                str(x).strip() for x in lines if isinstance(x, str) and x.strip()
+            )
         if self.measurement_columns:
             raw = pd.to_numeric(
                 row[self.measurement_columns], errors="coerce"

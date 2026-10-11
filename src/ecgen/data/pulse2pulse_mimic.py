@@ -79,12 +79,18 @@ class Pulse2PulseMIMICDataModule(pl.LightningDataModule):
             seq_length=self.config.seq_length,
         )
 
-        self.train_dataset = ECGDatasetAdapter(train_base, num_leads=self.config.num_channels)
-        self.val_dataset = ECGDatasetAdapter(val_base, num_leads=self.config.num_channels)
+        self.train_dataset = ECGDatasetAdapter(
+            train_base, num_leads=self.config.num_channels
+        )
+        self.val_dataset = ECGDatasetAdapter(
+            val_base, num_leads=self.config.num_channels
+        )
 
     def train_dataloader(self) -> DataLoader:
         if self.train_dataset is None:
-            raise RuntimeError("train_dataset is not set. Did you forget to call setup()? ")
+            raise RuntimeError(
+                "train_dataset is not set. Did you forget to call setup()? "
+            )
         return DataLoader(
             self.train_dataset,
             batch_size=self.config.batch_size,
@@ -95,7 +101,9 @@ class Pulse2PulseMIMICDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         if self.val_dataset is None:
-            raise RuntimeError("val_dataset is not set. Did you forget to call setup()? ")
+            raise RuntimeError(
+                "val_dataset is not set. Did you forget to call setup()? "
+            )
         return DataLoader(
             self.val_dataset,
             batch_size=self.config.batch_size,
@@ -103,4 +111,3 @@ class Pulse2PulseMIMICDataModule(pl.LightningDataModule):
             num_workers=self.config.num_workers,
             pin_memory=torch.cuda.is_available(),
         )
-

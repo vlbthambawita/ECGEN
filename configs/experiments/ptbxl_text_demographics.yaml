@@ -1,0 +1,46 @@
+# Flow matching on PTB-XL conditioned on the report text (frozen multilingual BERT
+# -> cross-attention tokens), demographics, and sex, with per-field dropout so any
+# subset can be given at sampling time.
+#   pip install 'ecgen[text]'
+#   ecgen train configs/experiments/ptbxl_text_demographics.yaml
+
+experiment: {name: ptbxl_text_demographics, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-ptbxl}
+
+model:
+  name: flow_matching
+  params:
+    in_channels: 12
+    process: {name: rectified_flow, params: {solver: heun}}
+    backbone: {name: unet1d, params: {base_channels: 64, channel_mults: [1, 2, 4, 4], attn_levels: [2, 3]}}
+    conditioning:
+      vector_dim: 256
+      token_dim: 256
+      encoders:
+        - {field: report, name: text, params: {model_name: bert-base-multilingual-cased, max_length: 64}}
+        - {field: demographics, name: numeric, params: {num_features: 3, dim: 256}}
+        - {field: sex, name: categorical, params: {num_classes: 2, dim: 256}}
+      dropout: {report: 0.15, demographics: 0.3, sex: 0.3}
+    lr: 0.0002
+    warmup_steps: 1000
+    ema_decay: 0.9995
+    sample_steps: 25
+
+data:
+  dataset:
+    name: ptbxl
+    params: {root: /work/vajira/DATA/EXG_PTB_XL/physionet/files/ptb-xl/1_0_1, sampling_rate: 500, leads: standard12, scale: zscore, labels: null}
+  batch_size: 32
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 150
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

@@ -24,6 +24,18 @@ model families: a family that supports it takes a `conditioning:` block in its
 | `numeric` | normalized values `[B, F]` + missing mask | vector (or tokens) | Missingness is an explicit input |
 | `fourier` | normalized values `[B, F]` | vector | Random Fourier features, for sharp dependence on scalars like heart rate |
 | `masked_signal` | reads `obs` / `obs_mask` (field name `obs`) | dense | `[x * mask, mask]`, optionally projected by a 1×1 conv |
+| `text_hash` | strings `list[str]` | tokens (or vector) | Hashed bag-of-words embeddings, trained with the model; no dependencies |
+| `text` | strings `list[str]` | tokens (or vector) | Frozen Hugging Face encoder (`model_name`, `max_length`); needs `ecgen[text]`; weights stay out of the checkpoint, embeddings are cached per distinct text |
+
+## Text conditions
+
+Report text is a string field: MIMIC (`report: true` joins the machine report
+lines), PTB-XL (`report`), and the synthetic data (a templated
+`"sinus tachycardia, high voltage"`). Strings are collated into lists and
+encoded into tokens that the backbone attends to (cross-attention in `unet1d`
+and `dit1d`). At sampling time pass one string for all samples or one per
+sample: `sample(n, cond={"report": "Sinus bradycardia"})`. An empty string or a
+missing field uses the null token.
 
 ## Config
 

@@ -89,6 +89,7 @@ With `ECGDataModule` the samples are collated into an `ecgen.types.ECGBatch` (`s
 | `ecg_norm_eps` | `1e-6` | Lower bound on the std for `"zscore"`. |
 | `measurements` | `None` | Columns of `machine_measurements.csv` returned in `cond["measurements"]`; `None` = the 9 standard measurements below; `[]` = none. |
 | `missing` | `"drop"` | `"drop"`: drop rows with a NaN in any measurement column (legacy). `"mask"`: keep them; NaNs become 0 and are flagged in `cond_missing`. `"mask"` keeps more subjects, so its split differs from `"drop"`. |
+| `report` | `false` | Add `cond["report"]`: the non-empty `report_0`…`report_17` machine statements joined by ". " (for text conditioning). |
 | `feature_normalizer` | `None` | Use these measurement statistics (a `FeatureNormalizer` or its dict) instead of fitting them on the train split. |
 
 In an experiment YAML these go under `data.dataset.params`; `data.split_params` overrides them per

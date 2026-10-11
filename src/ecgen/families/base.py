@@ -146,6 +146,15 @@ class GenerativeModule(pl.LightningModule):
                 vals, miss = zip(*(norm.transform(row) for row in raw))
                 out[field] = torch.as_tensor(np.stack(vals), device=device)
                 missing[field] = torch.as_tensor(np.stack(miss), device=device)
+            elif isinstance(value, str) or (
+                isinstance(value, (list, tuple)) and value and isinstance(value[0], str)
+            ):
+                texts = [value] * n if isinstance(value, str) else list(value)
+                if len(texts) != n:
+                    raise ValueError(
+                        f"{field}: got {len(texts)} strings for {n} samples"
+                    )
+                out[field] = texts
             else:
                 t = torch.as_tensor(value, device=device)
                 if t.dim() == 0 or (t.shape[0] != n):

@@ -28,7 +28,8 @@ class SyntheticECG(BaseECGDataset):
     - ``cond["measurements"]``: ``[heart_rate (bpm), amplitude (mV)]``, normalized
       with :attr:`feature_normalizer` (fixed statistics of the sampling ranges);
     - ``cond["rhythm"]``: class 0 = brady (< 60 bpm), 1 = normal, 2 = tachy (> 100 bpm);
-    - ``cond["labels"]``: multi-hot ``[brady, tachy, high_amplitude (> 1.25 mV)]``.
+    - ``cond["labels"]``: multi-hot ``[brady, tachy, high_amplitude (> 1.25 mV)]``;
+    - ``cond["report"]``: a templated text, e.g. ``"sinus tachycardia, high voltage"``.
 
     Args:
         split: ``"train"``, ``"val"``, or ``"test"`` (different records per split).
@@ -119,12 +120,15 @@ class SyntheticECG(BaseECGDataset):
         features, missing = self.feature_normalizer.transform([hr, amp])
         rhythm = 0 if hr < 60 else (2 if hr > 100 else 1)
         labels = np.array([hr < 60, hr > 100, amp > 1.25], dtype=np.float32)
+        rhythm_text = ("sinus bradycardia", "sinus rhythm", "sinus tachycardia")[rhythm]
+        report = rhythm_text + (", high voltage" if amp > 1.25 else "")
         return {
             "signal": torch.from_numpy(scale_signal(ecg, self.scale)),
             "cond": {
                 "measurements": torch.from_numpy(features),
                 "rhythm": torch.tensor(rhythm, dtype=torch.long),
                 "labels": torch.from_numpy(labels),
+                "report": report,
             },
             "cond_missing": {"measurements": torch.from_numpy(missing)},
             "meta": {"index": idx, "heart_rate": float(hr), "amplitude": float(amp)},
