@@ -1,0 +1,51 @@
+# Lead reconstruction / imputation by diffusion: the U-Net sees [x * mask, mask]
+# next to the noisy signal; the loss is on the unobserved part; observed entries
+# of the noisy input are kept clean (SSSD-style).
+#   ecgen train configs/experiments/diffusion_mimic_leads.yaml
+# Sample: .sample(n, obs=x, obs_mask=m)    (e.g. only lead I observed)
+# Evaluate: python scripts/evaluate/lead_reconstruction.py <ckpt> --family diffusion --keep I
+
+experiment: {name: diffusion_mimic_leads, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-diffusion}
+
+model:
+  name: diffusion
+  params:
+    in_channels: 12
+    process: {name: ddpm, params: {schedule: cosine, prediction: v}}
+    backbone: {name: unet1d, params: {base_channels: 64, channel_mults: [1, 2, 4, 4], attn_levels: [3]}}
+    conditioning:
+      encoders:
+        - {field: obs, name: masked_signal, params: {num_leads: 12}}
+    loss_on: unobserved
+    clean_observed: true
+    lr: 0.0002
+    warmup_steps: 1000
+    ema_decay: 0.9995
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params: {root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0, max_samples: 50000, leads: standard12, scale: zscore}
+  masks:
+    name: mixture
+    params:
+      components:
+        - {weight: 0.5, name: lead_subset, params: {keep: [[I], [II], [I, II], [I, II, V1]]}}
+        - {weight: 0.3, name: lead_subset, params: {min_leads: 1, max_leads: 6}}
+        - {weight: 0.2, name: time_span, params: {min_frac: 0.1, max_frac: 0.6}}
+  split_params: {val: {max_samples: 1000}}
+  batch_size: 32
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: [0]
+  precision: bf16-mixed
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

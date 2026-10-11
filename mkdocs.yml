@@ -120,6 +120,7 @@ nav:
       - VAE: models/vae.md
       - VQ-VAE + Prior: models/vqvae.md
       - Pulse2Pulse GAN: models/gan.md
+      - Diffusion: models/diffusion.md
   - Visual Guide:
       - visual/index.md
       - VAE: visual/vae.md

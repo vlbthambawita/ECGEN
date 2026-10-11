@@ -57,3 +57,21 @@ Auto-generated from docstrings.
 ## `ecgen.families.gan.pulse2pulse`
 
 ::: ecgen.families.gan.pulse2pulse
+
+## `ecgen.families.continuous`
+
+::: ecgen.families.continuous.module
+
+## `ecgen.processes`
+
+::: ecgen.processes.base
+
+::: ecgen.processes.ddpm
+
+## `ecgen.nn.backbones.unet1d`
+
+::: ecgen.nn.backbones.unet1d
+
+## `ecgen.training.ema`
+
+::: ecgen.training.ema
