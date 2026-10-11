@@ -1,0 +1,51 @@
+# Conditional VAE on MIMIC-IV-ECG, conditioned on the 9 machine measurements.
+#   ecgen train configs/experiments/cvae_mimic.yaml [key=value ...]
+# Sample: VAELightning.load_from_checkpoint(ckpt).sample(n, cond={"measurements": [rr, p_on, ...]})
+# (raw units; NaN = unknown). latent_type: global gives coherent prior samples.
+
+experiment: {name: cvae_mimic, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-cvae}
+
+model:
+  name: vae
+  params:
+    in_channels: 12
+    base_channels: 64
+    latent_channels: 8
+    lr: 0.0005
+    kl_weight: 0.001
+    latent_type: global
+    global_latent_dim: 64
+    seq_length: 5000
+    learned_prior: true
+    conditioning:
+      vector_dim: 256
+      encoders:
+        - {field: measurements, name: fourier, params: {num_features: 9, dim: 256}}
+      dropout: {measurements: 0.1}
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params:
+      root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+      max_samples: 50000
+      missing: mask        # keep records with missing measurements (masked)
+      scale: zscore
+  batch_size: 32
+  num_workers: 8
+
+checkpoint: {monitor: val_loss, mode: min, save_top_k: 3}
+
+callbacks:
+  - {name: lr_monitor, params: {logging_interval: step}}
+  - {name: vae_visualization, params: {log_every_n_epochs: 5, num_samples: 4, log_to_tensorboard: false}}
+
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: [0]
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 1.0

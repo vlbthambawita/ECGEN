@@ -33,3 +33,42 @@ def vae_loss(
     total_loss = recon_loss + kl_weight * kl_loss
 
     return total_loss, recon_loss, kl_loss
+
+
+def gaussian_kl(
+    mean: Tensor, logvar: Tensor, prior_mean: Tensor, prior_logvar: Tensor
+) -> Tensor:
+    """Summed ``KL(N(mean, var) || N(prior_mean, prior_var))``."""
+    return 0.5 * torch.sum(
+        prior_logvar
+        - logvar
+        + (logvar.exp() + (mean - prior_mean).pow(2)) / prior_logvar.exp()
+        - 1
+    )
+
+
+def cvae_loss(
+    recon: Tensor,
+    x: Tensor,
+    mean: Tensor,
+    logvar: Tensor,
+    prior_mean: Tensor,
+    prior_logvar: Tensor,
+    kl_weight: float = 0.0001,
+    recon_mask: Tensor | None = None,
+) -> tuple[Tensor, Tensor, Tensor]:
+    """
+    Conditional VAE loss: MSE + ``kl_weight`` * KL to a (learned) prior.
+
+    The KL is normalized like :func:`vae_loss` (by ``B * C * T``). With
+    ``recon_mask`` (1 = count), the MSE is averaged over masked entries only.
+    """
+    if recon_mask is None:
+        recon_loss = F.mse_loss(recon, x, reduction="mean")
+    else:
+        w = recon_mask.to(x.dtype)
+        recon_loss = ((recon - x) ** 2 * w).sum() / w.sum().clamp_min(1.0)
+    kl = gaussian_kl(mean, logvar, prior_mean, prior_logvar) / (
+        x.size(0) * x.size(1) * x.size(2)
+    )
+    return recon_loss + kl_weight * kl, recon_loss, kl

@@ -5,12 +5,10 @@ Training callbacks for ECG generation models.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from pytorch_lightning import Callback, LightningModule, Trainer
 

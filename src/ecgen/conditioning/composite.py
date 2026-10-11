@@ -161,7 +161,7 @@ class CompositeConditioner(nn.Module):
         cond = dict(cond or {})
         cond_missing = dict(cond_missing or {})
         b = batch_size or _infer_batch(cond, obs)
-        device = next(self.parameters()).device
+        device = _infer_device(self, cond, obs)
         drops = self._drop_masks(b, device, drop)
 
         vector: Optional[Tensor] = None
@@ -229,6 +229,20 @@ class CompositeConditioner(nn.Module):
             )
         keep = (~dropped).to(obs.dtype).view(-1, *([1] * (obs.dim() - 1)))
         return enc((obs * keep, obs_mask.to(obs.dtype) * keep))
+
+
+def _infer_device(
+    module: nn.Module, cond: Mapping[str, Tensor], obs: Optional[Tensor]
+) -> torch.device:
+    # Not next(module.parameters()): an encoder set may have no parameters, and a
+    # StopIteration inside a Lightning step silently ends the epoch.
+    for v in cond.values():
+        return v.device
+    if obs is not None:
+        return obs.device
+    for p in module.parameters():
+        return p.device
+    return torch.device("cpu")
 
 
 def _infer_batch(cond: Mapping[str, Tensor], obs: Optional[Tensor]) -> int:

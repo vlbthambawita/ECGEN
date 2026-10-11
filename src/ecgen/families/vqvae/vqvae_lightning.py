@@ -17,14 +17,16 @@ from ecgen.utils.config import resolve_config
 class VQVAELightning(GenerativeModule):
     """
     PyTorch Lightning wrapper for VQ-VAE model.
-    
+
     Handles training, validation, and sampling for Stage 1 (VQ-VAE training).
     """
 
     family = "vqvae"
     supports = Capabilities(stages=2)
 
-    def __init__(self, config: VQVAEConfig | dict[str, Any] | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self, config: VQVAEConfig | dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         super().__init__()
         config = resolve_config(VQVAEConfig, config, kwargs)
         self.save_hyperparameters(config.__dict__)
@@ -52,15 +54,32 @@ class VQVAELightning(GenerativeModule):
         recon, vq_loss_val, indices = self.vqvae(ecgs)
         total_loss, recon_loss, vq_loss_component = vqvae_loss(recon, ecgs, vq_loss_val)
 
-        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/recon_loss", recon_loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/vq_loss", vq_loss_component, on_step=True, on_epoch=True, prog_bar=False)
+        self.log(
+            "train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True
+        )
+        self.log(
+            "train/recon_loss", recon_loss, on_step=True, on_epoch=True, prog_bar=True
+        )
+        self.log(
+            "train/vq_loss",
+            vq_loss_component,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+        )
 
         # Log codebook usage statistics
         if batch_idx % 100 == 0:
             unique_codes = torch.unique(indices).numel()
-            self.log("train/unique_codes", float(unique_codes), on_step=True, on_epoch=False)
-            self.log("train/codebook_usage", float(unique_codes) / self.config.num_embeddings, on_step=True, on_epoch=False)
+            self.log(
+                "train/unique_codes", float(unique_codes), on_step=True, on_epoch=False
+            )
+            self.log(
+                "train/codebook_usage",
+                float(unique_codes) / self.config.num_embeddings,
+                on_step=True,
+                on_epoch=False,
+            )
 
         return total_loss
 
@@ -70,15 +89,30 @@ class VQVAELightning(GenerativeModule):
         recon, vq_loss_val, indices = self.vqvae(ecgs)
         total_loss, recon_loss, vq_loss_component = vqvae_loss(recon, ecgs, vq_loss_val)
 
-        self.log("val/total_loss", total_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/recon_loss", recon_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/vq_loss", vq_loss_component, on_step=False, on_epoch=True, prog_bar=False)
+        self.log(
+            "val/total_loss", total_loss, on_step=False, on_epoch=True, prog_bar=True
+        )
+        self.log(
+            "val/recon_loss", recon_loss, on_step=False, on_epoch=True, prog_bar=True
+        )
+        self.log(
+            "val/vq_loss",
+            vq_loss_component,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+        )
         self.log("val_loss", total_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # Log codebook usage
         unique_codes = torch.unique(indices).numel()
         self.log("val/unique_codes", float(unique_codes), on_step=False, on_epoch=True)
-        self.log("val/codebook_usage", float(unique_codes) / self.config.num_embeddings, on_step=False, on_epoch=True)
+        self.log(
+            "val/codebook_usage",
+            float(unique_codes) / self.config.num_embeddings,
+            on_step=False,
+            on_epoch=True,
+        )
 
         if batch_idx == 0:
             self._val_real_sample = ecgs[0].detach().cpu()
@@ -129,7 +163,7 @@ class VQVAELightning(GenerativeModule):
     def sample(self, n_samples: int = 16, seq_length: int = 5000) -> Tensor:
         """
         Sample by randomly selecting codebook indices.
-        
+
         Note: This is not a good sampling method. For proper generation,
         use the trained prior model (Stage 2).
         """
@@ -137,7 +171,7 @@ class VQVAELightning(GenerativeModule):
         device = next(self.vqvae.parameters()).device
 
         latent_length = self.latent_length(seq_length)
-        
+
         # Random indices (not a good prior!)
         indices = torch.randint(
             0,
@@ -145,7 +179,7 @@ class VQVAELightning(GenerativeModule):
             (n_samples, latent_length),
             device=device,
         )
-        
+
         samples = self.vqvae.decode_from_indices(indices)
         return samples
 

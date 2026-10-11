@@ -12,10 +12,10 @@ from ecgen.families.vqvae.vector_quantizer import VectorQuantizer
 class VQVAE1D(nn.Module):
     """
     Vector Quantized Variational Autoencoder for ECG signals.
-    
+
     Uses discrete latent representations instead of continuous ones.
     Architecture follows the existing VAE1D design but with vector quantization.
-    
+
     Args:
         in_channels: Number of input channels (ECG leads)
         base_channels: Base number of channels in encoder/decoder
@@ -70,13 +70,13 @@ class VQVAE1D(nn.Module):
     def encode(self, x: Tensor) -> tuple[Tensor, Tensor]:
         """
         Encode input to continuous latent representation.
-        
+
         Note: For VQ-VAE, encoder outputs a single tensor (not mean/logvar like VAE).
         We return it twice for API compatibility with VAE.
-        
+
         Args:
             x: Input ECG signals [B, C, L]
-            
+
         Returns:
             z: Continuous latent [B, latent_channels, L//downsample_factor]
             z: Same tensor (for compatibility)
@@ -87,10 +87,10 @@ class VQVAE1D(nn.Module):
     def quantize(self, z: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """
         Quantize continuous latent to discrete codes.
-        
+
         Args:
             z: Continuous latent [B, latent_channels, L_latent]
-            
+
         Returns:
             vq_loss: Vector quantization loss
             z_q: Quantized latent [B, latent_channels, L_latent]
@@ -101,10 +101,10 @@ class VQVAE1D(nn.Module):
     def decode(self, z_q: Tensor) -> Tensor:
         """
         Decode quantized latent to reconstruction.
-        
+
         Args:
             z_q: Quantized latent [B, latent_channels, L_latent]
-            
+
         Returns:
             Reconstructed ECG [B, in_channels, L]
         """
@@ -113,10 +113,10 @@ class VQVAE1D(nn.Module):
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """
         Full forward pass: encode -> quantize -> decode.
-        
+
         Args:
             x: Input ECG signals [B, in_channels, L]
-            
+
         Returns:
             recon: Reconstructed ECG [B, in_channels, L]
             vq_loss: Vector quantization loss
@@ -138,10 +138,10 @@ class VQVAE1D(nn.Module):
         """
         Encode input ECG to discrete codebook indices.
         Used for training the prior model.
-        
+
         Args:
             x: Input ECG signals [B, in_channels, L]
-            
+
         Returns:
             indices: Codebook indices [B, L_latent]
         """
@@ -154,10 +154,10 @@ class VQVAE1D(nn.Module):
         """
         Decode from discrete codebook indices to ECG.
         Used for generation from the prior model.
-        
+
         Args:
             indices: Codebook indices [B, L_latent]
-            
+
         Returns:
             Reconstructed ECG [B, in_channels, L]
         """

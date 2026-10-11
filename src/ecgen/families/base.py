@@ -192,6 +192,11 @@ class GenerativeModule(pl.LightningModule):
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         self.data_info = dict(checkpoint.get("ecgen_data_info") or {})
 
+    @property
+    def fixed_seq_length(self) -> Optional[int]:
+        """Signal length the network is built for, or ``None`` if any length works."""
+        return None
+
     # -------------------------------------------------------------- sampling
 
     def sample(self, n_samples: int = 16, **kwargs: Any) -> Tensor:

@@ -390,6 +390,42 @@ independently mergeable.
    and **round-trip `sample(cond=raw)`** with saved normalizer statistics.
 
 ### Phase 2 — Conditional versions of existing families
+
+> **Status: done (with an honest acceptance result).**
+>
+> **Implemented:**
+> - Conditional VAE, with an added `latent_type: global` option.
+> - Conditional and paired Pulse2Pulse: projection critic, separate critic conditioner,
+>   `l1_weight`, and a new `output_scale`.
+> - Conditional PixelCNN prior with classifier-free guidance on the logits.
+> - `ecgen.evaluation.measure.heart_rate` and `scripts/evaluate/condition_adherence.py`.
+> - Unconditional VAE and prior remain bit-identical to the original scripts on MIMIC.
+>
+> **Fixed along the way:**
+> - The Pulse2Pulse critic's `fc1` was never in its optimizer.
+> - A parameter-free conditioner raised `StopIteration`, which silently ended Lightning epochs.
+>
+> **Acceptance on synthetic ECGs** (known heart rate; 4000 records, 20–60 epochs). Requested vs.
+> measured heart rate:
+>
+> | Model | r | MAE (bpm) | Unconditional baseline (r, MAE) |
+> |---|---|---|---|
+> | Conditional prior | 0.80 | 10.6 | 0.19, 31.4 |
+> | Conditional prior + CFG (w=3) | 0.85 | 8.7 | 0.19, 31.4 |
+> | Conditional Pulse2Pulse | 0.28 | 29.5 | 0.11, 27.2 |
+> | CVAE | ≈0 | — | — |
+>
+> - **Conditional prior:** passes.
+> - **Conditional Pulse2Pulse:** improves on its baseline but is under-trained at this budget.
+> - **CVAE:** does not pass, at any KL weight or latent type tried:
+>   - Spatial latents have an incoherent per-position prior.
+>   - A global latent either absorbs the heart rate (low KL) or collapses to the mean ECG
+>     (high KL).
+>
+>   The CVAE remains useful as an autoencoder and as a first stage (Phase 5).
+> - On real MIMIC, all three conditional configs smoke-train and sample. The heart-rate
+>   detector agrees with MIMIC machine RR intervals at r = 0.87 (simple) and 0.98 (NeuroKit2).
+
 1. **CVAE**: condition the encoder and decoder via FiLM, with an optional learned prior `p(z|c)`.
 2. **Conditional Pulse2Pulse**: (a) FiLM-conditioned generator + **projection discriminator** for
    vector conditions; (b) **lead-to-12-lead** paired mode (U-Net generator takes the masked signal, D

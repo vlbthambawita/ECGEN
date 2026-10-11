@@ -9,10 +9,10 @@ from torch import Tensor
 class VectorQuantizer(nn.Module):
     """
     Vector Quantizer module for VQ-VAE.
-    
+
     Implements discrete latent space quantization using a learned codebook.
     Uses straight-through estimator for gradient flow during backpropagation.
-    
+
     Args:
         num_embeddings: Size of the codebook (number of discrete codes)
         embedding_dim: Dimensionality of each code vector
@@ -36,10 +36,10 @@ class VectorQuantizer(nn.Module):
     def forward(self, z: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """
         Quantize continuous latent vectors to discrete codes.
-        
+
         Args:
             z: Encoder output [B, C, L] where C = embedding_dim
-            
+
         Returns:
             vq_loss: Vector quantization loss (codebook + commitment)
             quantized: Quantized latent codes [B, C, L]
@@ -79,7 +79,7 @@ class VectorQuantizer(nn.Module):
 
         # Reshape back: [B, L, C] -> [B, C, L]
         quantized = quantized.permute(0, 2, 1).contiguous()
-        
+
         # Return indices as [B, L]
         indices = encoding_indices.view(z.shape[0], -1)
 
@@ -89,17 +89,17 @@ class VectorQuantizer(nn.Module):
     def get_codebook_entry(self, indices: Tensor) -> Tensor:
         """
         Get quantized vectors from codebook indices.
-        
+
         Args:
             indices: Codebook indices [B, L]
-            
+
         Returns:
             Quantized vectors [B, C, L]
         """
         # Get embeddings
         quantized = self.embedding(indices)  # [B, L, C]
-        
+
         # Reshape to [B, C, L]
         quantized = quantized.permute(0, 2, 1).contiguous()
-        
+
         return quantized

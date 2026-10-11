@@ -1,0 +1,50 @@
+# Paired Pulse2Pulse: reconstruct the 8 independent leads from lead I (or I + II).
+# The generator sees noise + [x * mask, mask]; the critic sees the signal next to the
+# same observation; an L1 term on the unobserved leads pulls toward the real ECG.
+#   ecgen train configs/experiments/pulse2pulse_lead_reconstruction.yaml
+# Sample: Pulse2PulseGAN.load_from_checkpoint(ckpt).sample(n, obs=x, obs_mask=m)
+
+experiment: {name: pulse2pulse_leads, seed: 42, runs_root: runs}
+
+wandb: {enabled: false, project: ecg-pulse2pulse}
+
+model:
+  name: pulse2pulse
+  params:
+    model_size: 50
+    num_channels: 8
+    seq_length: 5000
+    n_critic: 5
+    l1_weight: 100.0
+    l1_on: unobserved
+    output_scale: 8.0     # z-scored data exceeds the tanh range
+    conditioning:
+      encoders:
+        - {field: obs, name: masked_signal, params: {num_leads: 8}}
+
+data:
+  dataset:
+    name: mimic_iv_ecg
+    params:
+      root: /work/vajira/DATA/SEARCH/MIMIC_IV_ECG_raw_v1/mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0
+      max_samples: 50000
+      leads: independent8
+      scale: zscore
+  masks:
+    name: lead_subset
+    params: {keep: [[I], [I, II]]}
+  split_params: {val: {max_samples: 1000}}
+  batch_size: 64
+  num_workers: 8
+
+checkpoint: {monitor: val/l1, mode: min, save_top_k: 3}
+
+callbacks:
+  - {name: ecg_visualization, params: {every_n_epochs: 5, n_samples: 1}}
+
+trainer:
+  max_epochs: 200
+  accelerator: gpu
+  devices: [0]
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1

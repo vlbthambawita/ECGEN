@@ -13,7 +13,8 @@ import yaml
 from ecgen.cli import main as cli_main
 from ecgen.families import PriorLightning, Pulse2PulseGAN, VAELightning, VQVAELightning
 from ecgen.families.vqvae import VQVAEConfig
-from ecgen.training.runner import apply_overrides, resolve_config, train
+from ecgen.registry import DATASETS
+from ecgen.training.runner import apply_overrides, build_model, resolve_config, train
 
 SEQ = 512
 
@@ -229,13 +230,16 @@ def test_cli_print_config(tmp_path, capsys):
     assert printed["trainer"]["max_epochs"] == 7
 
 
-@pytest.mark.parametrize(
-    "name", ["vae_mimic", "vqvae_mimic", "prior_mimic", "pulse2pulse_mimic"]
-)
+EXPERIMENTS = Path(__file__).resolve().parents[2] / "configs" / "experiments"
+
+
+@pytest.mark.parametrize("name", sorted(p.stem for p in EXPERIMENTS.glob("*.yaml")))
 def test_shipped_experiment_configs_resolve(name):
     repo = Path(__file__).resolve().parents[2]
     cfg, _ = resolve_config(
         yaml.safe_load((repo / "configs" / "experiments" / f"{name}.yaml").read_text())
     )
-    assert cfg["model"]["name"] in {"vae", "vqvae", "vqvae_prior", "pulse2pulse"}
-    assert cfg["data"]["dataset"]["name"] == "mimic_iv_ecg"
+    assert cfg["data"]["dataset"]["name"] in DATASETS
+    # Build the model too (catches bad params), except priors that need a stage-1 file
+    if "vqvae_checkpoint" not in cfg["model"].get("params", {}):
+        assert build_model(cfg["model"]) is not None

@@ -83,3 +83,33 @@ x = model.sample(8, cond={})                               # unconditional (null
 ```
 
 Use `NaN` (or `None`) for an unknown value inside a numeric field.
+
+## Conditional families
+
+| Family | `accepts` | How conditions enter | Extras |
+|---|---|---|---|
+| `vae` (CVAE) | vector, dense | FiLM after every encoder/decoder residual block; dense concatenated to the encoder input and (pooled) to the decoder input | `learned_prior: true` → `p(z \| c)`; `latent_type: global` → one latent vector per ECG, whose prior samples decode to coherent ECGs (`spatial` latents reconstruct well but their prior samples do not); `recon_on: unobserved` for imputation |
+| `pulse2pulse` (cGAN) | vector, dense | Generator: FiLM on every decoder stage, dense concatenated to the input noise. Critic: projection head for vectors, dense concatenated to its input (paired / pix2pix critic) | `l1_weight` (e.g. 100) + `l1_on: unobserved` for lead reconstruction; the critic has its own conditioner copy (no dropout) |
+| `vqvae_prior` (conditional PixelCNN) | vector, dense | Condition added to both gate pre-activations of every causal block (`V_f h`, `V_g h`); dense pooled to code resolution | `sample(..., guidance=w)` = classifier-free guidance on the logits; the stage-1 VQ-VAE stays unconditional |
+
+All three keep their original parameters when `conditioning` is absent, so
+unconditional checkpoints load unchanged. Conditional models `paste_observed`
+the given part of `obs` into their output by default.
+
+Example configs: `configs/experiments/cvae_mimic.yaml`,
+`pulse2pulse_lead_reconstruction.yaml`, `prior_mimic_conditional.yaml`.
+
+## Checking condition adherence
+
+`scripts/evaluate/condition_adherence.py` samples a model at a grid of
+requested heart rates and measures the heart rate of the output
+(`ecgen.evaluation.measure.heart_rate`, R-peak detection; `method="neurokit"`
+uses NeuroKit2):
+
+```bash
+python scripts/evaluate/condition_adherence.py runs/cvae_mimic/seed_42/checkpoints/last.ckpt \
+    --family vae --target rr_interval --rates 50,70,90,110,130
+```
+
+It reports MAE and Pearson r between requested and measured rates; an
+unconditional checkpoint gives the baseline (r ≈ 0).

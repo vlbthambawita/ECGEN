@@ -23,7 +23,7 @@ from ecgen.data.datamodule import ECGDataModule
 from ecgen.data.datasets import SyntheticECG
 from ecgen.data.leads import STANDARD_12
 from ecgen.data.masks import build_mask
-from ecgen.families import VAELightning
+from ecgen.families import VQVAELightning
 from ecgen.nn.injection import (
     AdaGN,
     AdaLNZero,
@@ -291,7 +291,7 @@ def test_datamodule_adds_obs_mask():
 
 
 def test_unconditional_family_rejects_conditioning():
-    model = VAELightning()
+    model = VQVAELightning(base_channels=16, latent_channels=8, num_embeddings=8)
     with pytest.raises(ValueError, match="does not support conditioning"):
         model.init_conditioning(
             {

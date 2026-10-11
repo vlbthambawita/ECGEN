@@ -53,6 +53,18 @@ latent (8× temporal compression).
 | `lr` | `1e-4` | Adam learning rate |
 | `kl_weight` | `0.0001` | Weight of the KL term |
 | `b1`, `b2` | `0.9`, `0.999` | Adam betas |
+| `conditioning` | `None` | Conditioning config → conditional VAE (see [Conditioning](../training/conditioning.md#conditional-families)) |
+| `learned_prior` | `False` | Learn `p(z \| c)` instead of N(0, I) (needs `conditioning`) |
+| `recon_on` | `"all"` | `"unobserved"`: reconstruction loss only where `obs_mask` is 0 |
+| `latent_type` | `"spatial"` | `"global"`: one `global_latent_dim` vector per ECG; prior samples decode to coherent ECGs |
+| `global_latent_dim` | `64` | Size of the global latent |
+| `seq_length` | `5000` | Signal length, needed by `latent_type: global` |
+
+!!! note "Sampling from a spatial-latent VAE"
+    With `latent_type: spatial` every latent position has an independent N(0, 1) prior, so
+    `sample()` draws incoherent latents and the decoder output is not a realistic ECG. The
+    spatial VAE is a good autoencoder (e.g. the first stage of a latent diffusion model), not
+    a sampler on its own. Use `latent_type: global` for sampling.
 
 All widths (`base_channels × m`) must be divisible by 8 because of `GroupNorm(8, ·)`.
 

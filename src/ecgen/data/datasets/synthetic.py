@@ -83,17 +83,32 @@ class SyntheticECG(BaseECGDataset):
     def render(
         cls, hr: float, amp: float, num_leads: int, seq_length: int, fs: int, rng
     ) -> np.ndarray:
-        """The ``[C, T]`` signal for a heart rate (bpm) and amplitude (mV)."""
-        t = np.arange(seq_length) / fs
-        phase = (t * hr / 60.0 + rng.uniform()) % 1.0
-        beat = amp * np.exp(-((phase - 0.3) ** 2) / 2e-4) + 0.2 * amp * np.exp(
-            -((phase - 0.6) ** 2) / 4e-3
+        """
+        The ``[C, T]`` signal for a heart rate (bpm) and R amplitude (mV).
+
+        Each beat has P, Q, R, S and T waves with fixed widths in seconds (the
+        QT interval shortens with the RR interval, Bazett-style); every lead is
+        the same beat train times a random gain and sign, plus white noise.
+        """
+        rr = 60.0 / hr
+        t = np.arange(seq_length) / fs - rng.uniform(0, rr)
+
+        def wave(center: float, width: float) -> np.ndarray:
+            dt = (t - center + rr / 2) % rr - rr / 2  # time to the nearest wave
+            return np.exp(-(dt**2) / (2 * width**2))
+
+        beat = (
+            0.12 * wave(-0.16, 0.025)  # P
+            - 0.15 * wave(-0.03, 0.008)  # Q
+            + wave(0.0, 0.012)  # R
+            - 0.25 * wave(0.03, 0.010)  # S
+            + 0.30 * wave(0.30 * np.sqrt(rr), 0.045)  # T
         )
         gains = rng.uniform(0.5, 1.0, size=(num_leads, 1)) * rng.choice(
             [-1.0, 1.0], size=(num_leads, 1)
         )
         noise = 0.02 * rng.standard_normal((num_leads, seq_length))
-        return (gains * beat[None, :] + noise).astype(np.float32)
+        return (amp * gains * beat[None, :] + noise).astype(np.float32)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         rng = np.random.default_rng(self.seed + _SPLIT_OFFSET[self.split] + idx)

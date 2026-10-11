@@ -259,15 +259,34 @@ The constructor accepts either `config=` or the flat `Pulse2PulseConfig` fields 
 the saved size before the state dict is loaded, so strict loading works and `strict=False` is
 not needed. `scripts/generate/generate_pulse2pulse.py` uses this call.
 
+## Conditional Pulse2Pulse
+
+With `conditioning` in the config, `Pulse2PulseGAN` is a conditional WGAN-GP
+(see [Conditioning](../training/conditioning.md#conditional-families)):
+global conditions drive FiLM layers in the generator's decoder and a projection
+head in the critic; a dense `masked_signal` condition is concatenated to the
+generator's noise and to the critic's input (paired critic). `l1_weight` adds a
+pix2pix-style L1 term on the unobserved part, which makes it a lead-reconstruction
+model (`configs/experiments/pulse2pulse_lead_reconstruction.yaml`).
+
+| Field | Default | Meaning |
+|---|---|---|
+| `conditioning` | `None` | Conditioning config (`ecgen.conditioning`) |
+| `l1_weight` | `0.0` | Weight of the L1 term to the real ECG |
+| `l1_on` | `"unobserved"` | L1 on the unobserved part (needs `data.masks`) or on `"all"` |
+| `output_scale` | `1.0` | Multiplies the generator's `tanh` output |
+
 ## Known issues
 
-- **The critic's final linear layer is never trained.** `fc1` is created on the first
-  forward pass, which happens after `configure_optimizers()` has built `opt_d`, so `fc1` is
-  not in the optimizer. Its parameters stay at their random Kaiming initialisation (verified:
-  `fc1.weight` is not in `opt_d.param_groups`).
+- **Fixed: the critic's final linear layer was never trained.** `fc1` used to be created
+  on the first forward pass, after `configure_optimizers()` had built `opt_d`, so it stayed at
+  its random initialisation. `Pulse2PulseGAN` now builds `fc1` in `__init__` (from
+  `seq_length`), so it is in the critic's optimizer. Models trained before this fix had a
+  fixed random `fc1`; their checkpoints still load.
 - **Output range vs. data scaling.** The generator ends in `tanh` (range `[-1, 1]`), but
-  `MIMICIVECG` (with the default `scale: zscore`) z-score normalises each record (zero mean, unit std), so real ECGs
-  regularly exceed ±1.
+  `MIMICIVECG` (with the default `scale: zscore`) z-score normalises each record (zero mean,
+  unit std), so real ECGs regularly exceed ±1. Set `output_scale` (e.g. `8.0` for z-scored
+  data) to stretch the generator's range, or scale the data into ±1 (e.g. `scale: 5` = mV / 5).
 - **`n_critic` is based on `batch_idx`.** If an epoch has fewer than `n_critic` batches
   (for example, with a tiny `max_samples`), the generator is never updated. The epoch mean of
   `train/g_loss` includes the logged zeros.

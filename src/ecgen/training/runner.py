@@ -199,7 +199,8 @@ def _model_io(model: pl.LightningModule) -> Dict[str, Optional[int]]:
     channels = getattr(config, "in_channels", None) or getattr(
         config, "num_channels", None
     )
-    return {"channels": channels, "seq_length": getattr(config, "seq_length", None)}
+    seq_length = getattr(model, "fixed_seq_length", getattr(config, "seq_length", None))
+    return {"channels": channels, "seq_length": seq_length}
 
 
 def check_compatibility(model: pl.LightningModule, datamodule: ECGDataModule) -> None:

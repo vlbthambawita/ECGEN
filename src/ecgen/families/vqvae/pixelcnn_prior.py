@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,16 +22,35 @@ class CausalGatedBlock(nn.Module):
         dilation: Dilation of the convolution
     """
 
-    def __init__(self, channels: int, kernel_size: int = 2, dilation: int = 1) -> None:
+    def __init__(
+        self,
+        channels: int,
+        kernel_size: int = 2,
+        dilation: int = 1,
+        cond_dim: int = 0,
+        dense_channels: int = 0,
+    ) -> None:
         super().__init__()
         self.left_pad = (kernel_size - 1) * dilation
+        # Conditional PixelCNN (van den Oord et al., 2016): the condition adds
+        # V_f h / V_g h to both gate pre-activations; zero-initialised
+        self.cond_proj = nn.Linear(cond_dim, 2 * channels) if cond_dim else None
+        self.dense_proj = (
+            nn.Conv1d(dense_channels, 2 * channels, 1) if dense_channels else None
+        )
+        for m in (self.cond_proj, self.dense_proj):
+            if m is not None:
+                nn.init.zeros_(m.weight)
+                nn.init.zeros_(m.bias)
 
         # Gated convolution: outputs 2x channels for tanh and sigmoid gates
         self.conv = nn.Conv1d(channels, 2 * channels, kernel_size, dilation=dilation)
         self.residual = nn.Conv1d(channels, channels, kernel_size=1)
         self.skip = nn.Conv1d(channels, channels, kernel_size=1)
 
-    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, c: Optional[Tensor] = None, dense: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
         """
         Args:
             x: Input tensor [B, C, L]
@@ -38,6 +59,10 @@ class CausalGatedBlock(nn.Module):
             (residual output [B, C, L], skip output [B, C, L])
         """
         out = self.conv(F.pad(x, (self.left_pad, 0)))
+        if self.cond_proj is not None and c is not None:
+            out = out + self.cond_proj(c)[..., None]
+        if self.dense_proj is not None and dense is not None:
+            out = out + self.dense_proj(dense)
 
         # Split into two halves for gated activation
         out_tanh, out_sigmoid = torch.chunk(out, 2, dim=1)
@@ -72,6 +97,8 @@ class PixelCNNPrior(nn.Module):
         num_layers: int = 10,
         kernel_size: int = 2,
         dilation_cycle: int = 10,
+        cond_dim: int = 0,
+        dense_channels: int = 0,
     ) -> None:
         super().__init__()
         self.num_embeddings = num_embeddings
@@ -83,7 +110,8 @@ class PixelCNNPrior(nn.Module):
         self.dilations = [2 ** (i % dilation_cycle) for i in range(num_layers)]
         self.kernel_size = kernel_size
         self.blocks = nn.ModuleList(
-            CausalGatedBlock(hidden_dim, kernel_size, d) for d in self.dilations
+            CausalGatedBlock(hidden_dim, kernel_size, d, cond_dim, dense_channels)
+            for d in self.dilations
         )
 
         # Output head: project summed skip connections to logits over codebook
@@ -99,12 +127,19 @@ class PixelCNNPrior(nn.Module):
         """Number of preceding codes that can influence the prediction of a code."""
         return 1 + sum((self.kernel_size - 1) * d for d in self.dilations)
 
-    def forward(self, indices: Tensor) -> Tensor:
+    def forward(
+        self,
+        indices: Tensor,
+        c: Optional[Tensor] = None,
+        dense: Optional[Tensor] = None,
+    ) -> Tensor:
         """
         Compute logits for each discrete code given the codes before it.
 
         Args:
             indices: Discrete code indices [B, L]
+            c: Optional global condition [B, cond_dim]
+            dense: Optional condition at code resolution [B, dense_channels, L]
 
         Returns:
             Logits over codebook [B, num_embeddings, L]; position t predicts
@@ -118,7 +153,7 @@ class PixelCNNPrior(nn.Module):
 
         skip = torch.zeros_like(x)
         for block in self.blocks:
-            x, s = block(x)
+            x, s = block(x, c, dense)
             skip = skip + s
 
         return self.head(skip)
@@ -130,6 +165,11 @@ class PixelCNNPrior(nn.Module):
         latent_length: int = 625,  # 5000 samples / 8x VQ-VAE downsampling
         temperature: float = 1.0,
         device: str = "cuda",
+        c: Optional[Tensor] = None,
+        dense: Optional[Tensor] = None,
+        c_uncond: Optional[Tensor] = None,
+        dense_uncond: Optional[Tensor] = None,
+        guidance: float = 1.0,
     ) -> Tensor:
         """
         Sample discrete codes autoregressively from the prior.
@@ -139,17 +179,34 @@ class PixelCNNPrior(nn.Module):
             latent_length: Length of latent sequence
             temperature: Sampling temperature (higher = more random)
             device: Device to generate samples on
+            c, dense: Conditions (see :meth:`forward`); ``dense`` covers all
+                ``latent_length`` positions.
+            c_uncond, dense_uncond: The null conditions, for classifier-free guidance.
+            guidance: CFG scale ``w``; logits = ``l_u + w (l_c - l_u)``. 1 = no guidance.
 
         Returns:
             Sampled indices [B, L]
         """
-        indices = torch.zeros(batch_size, latent_length, dtype=torch.long, device=device)
+        indices = torch.zeros(
+            batch_size, latent_length, dtype=torch.long, device=device
+        )
+        use_cfg = guidance != 1.0 and (c_uncond is not None or dense_uncond is not None)
+
+        def window(d: Optional[Tensor], start: int, stop: int) -> Optional[Tensor]:
+            return None if d is None else d[..., start:stop]
 
         for i in range(latent_length):
             # Logits at position i depend only on codes < i, so only the last
             # receptive_field codes before i are needed
             start = max(0, i - self.receptive_field)
-            logits = self.forward(indices[:, start : i + 1])[:, :, -1] / temperature
+            ctx = indices[:, start : i + 1]
+            logits = self.forward(ctx, c, window(dense, start, i + 1))[:, :, -1]
+            if use_cfg:
+                uncond = self.forward(
+                    ctx, c_uncond, window(dense_uncond, start, i + 1)
+                )[:, :, -1]
+                logits = uncond + guidance * (logits - uncond)
+            logits = logits / temperature
 
             # Sample from categorical distribution
             probs = torch.softmax(logits, dim=-1)
