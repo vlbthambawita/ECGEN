@@ -94,12 +94,9 @@ samples = model.sample(n_samples=16, seq_length=5000)
 ```text
 ECGEN/
 ├── src/ecgen/       # installed package: families/, nn/, data/, training/ (runner, callbacks), cli.py
-├── models/          # compatibility shims; diffusion/, ssm/ placeholders
-├── data/            # compatibility shims for the old dataset paths
-├── training/        # metrics/, losses/common.py, trainers/ (+ shims)
+├── training/        # metrics/, losses/common.py
 ├── evaluation/      # metrics/, benchmark.py, visualize.py
 ├── visualization/   # ECG plots, latent space, training curves
-├── utils/           # compatibility shims to ecgen.utils
 ├── scripts/         # shell/ (run_train_*.sh), generate/, evaluate/, data/
 ├── configs/         # dataset/, model/, training/, experiments/
 ├── single_file/     # self-contained VQ-VAE implementation

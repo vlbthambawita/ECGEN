@@ -1,6 +1,16 @@
 """
-Deprecated: use :mod:`ecgen.families`. Kept for backward compatibility.
+Deprecated since 1.1.0 and removed in 2.0: use :mod:`ecgen.families` (and
+:mod:`ecgen.nn` for the building blocks).
 """
+
+import warnings
+
+warnings.warn(
+    "ecgen.models is deprecated and will be removed in ecgen 2.0; "
+    "use ecgen.families (and ecgen.nn for the building blocks).",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from ecgen.models.pulse2pulse import (
     Pulse2PulseConfig,

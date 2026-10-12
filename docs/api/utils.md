@@ -1,6 +1,6 @@
 # Utilities API
 
-Small helpers in `ecgen.utils`. The root `utils/` modules are deprecated re-export shims of these.
+Small helpers in `ecgen.utils`.
 
 ## Config
 

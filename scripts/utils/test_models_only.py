@@ -20,7 +20,7 @@ def test_basic_imports():
     print("=" * 60)
     
     print("\n[1] Importing model components...")
-    from ecgen.models.pulse2pulse import (
+    from ecgen.families.gan.pulse2pulse import (
         WaveGANGenerator,
         WaveGANDiscriminator,
         Transpose1dLayer,

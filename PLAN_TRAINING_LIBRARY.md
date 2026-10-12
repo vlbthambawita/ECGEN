@@ -568,11 +568,12 @@ independently mergeable.
 >   top-level research packages.
 >
 > **Deliberately not done:**
-> - The shims are kept. The plan removes them *after one release*, and none has happened
->   since they were added.
+> - Released as v1.1.0 (2026-10-12) with the shims still in place. The shims were removed
+>   right after: the root `models/`, `data/`, `utils/`, `training/callbacks/`,
+>   `training/trainers/` packages are gone. `ecgen.models` is published API, so it stays as a
+>   deprecated alias that warns on import, with removal in 2.0.
 > - Lightning stays a core dependency (open decision 2), so there is no `ecgen[train]` extra.
-> - Tagging is left to the maintainer. Existing tags go up to v1.0.1, so the next minor is
->   v1.1.0 rather than v0.x.0. Pushing a tag publishes to PyPI.
+> - Tagged v1.1.0 rather than v0.x.0, since tags already went up to v1.0.1; it is on PyPI.
 >
 > **Docs CI incident:** the docs CI failed on the Phase 1–7 pushes to `main`. Docstrings
 > grouped parameters (`a, b: …`), which griffe rejects under `--strict`, and local checks had

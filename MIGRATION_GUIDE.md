@@ -4,7 +4,8 @@
 
 Training is now part of the published package and runs through one runner:
 `ecgen train configs/experiments/<x>.yaml [key=value ...]` (see `PLAN_TRAINING_LIBRARY.md`).
-The old import paths below still work for one release (they re-export the new modules).
+The old import paths below re-exported the new modules in 1.1.0 and were **removed in 1.2**.
+`ecgen.models.*` still works but emits a `DeprecationWarning`; it will be removed in 2.0.
 
 | Old | New |
 |---|---|
@@ -19,7 +20,7 @@ The old import paths below still work for one release (they re-export the new mo
 | `data.datasets.base.BaseECGDataset` | `ecgen.data.datasets.BaseECGDataset` (samples use `"signal"`, not `"ecg_signals"`) |
 | `data.datasets.mimic.MIMICIVECGDataset` (tuples) | `ecgen.data.datasets.MIMICIVECG` (dicts) + `ecgen.data.datamodule.ECGDataModule` |
 | `scripts/train/train_{vae_mimic,vqvae_mimic,prior_mimic,pulse2pulse}.py` | `ecgen train <config>` (scripts removed) |
-| `training/trainers/gan_trainer.py`, `python -m ecgen.training.train` | `ecgen train <config>` (old entry points forward to it) |
+| `training/trainers/gan_trainer.py` (removed in 1.2), `python -m ecgen.training.train` | `ecgen train <config>` (the module entry point forwards to it) |
 | `--vqvae-checkpoint <ckpt>` | `model.params.vqvae_checkpoint=<ckpt>` |
 
 Config files changed shape: `model: {name, params}` (flat), `data: {dataset: {name, params: {root, ...}}, batch_size, ...}`,
@@ -31,6 +32,9 @@ Config files changed shape: `model: {name, params}` (flat), `data: {dataset: {na
 ## Earlier reorganization
 
 Guide for migrating from the old structure to the new reorganized structure.
+
+> **Superseded.** The root-level `models.*`, `data.*`, `training.callbacks.*` and `utils.*` paths
+> this section points to were removed in 1.2. Use the `ecgen.*` paths in the table above.
 
 ## What Changed
 

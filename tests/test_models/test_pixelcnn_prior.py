@@ -6,8 +6,8 @@ receptive field it reports, and be trained and sampled with the same alignment.
 import pytest
 import torch
 
-from models.vqvae import PixelCNNPrior, PriorLightning
-from models.vqvae.config import PriorConfig
+from ecgen.families.vqvae import PixelCNNPrior, PriorLightning
+from ecgen.families.vqvae.config import PriorConfig
 
 
 def _prior(**kwargs) -> PixelCNNPrior:

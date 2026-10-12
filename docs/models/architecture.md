@@ -16,9 +16,8 @@ MIMIC-IV-ECG pipeline produces `12 × 5000` by default (10 s at 500 Hz).
 
 The families live in the `ecgen` package under `src/ecgen/families/` and register themselves with
 the training runner as `vae`, `vqvae`, `vqvae_prior` and `pulse2pulse` (see
-[Training with `ecgen train`](../training/runner.md)). The old import paths `models.vae`,
-`models.vqvae`, `models.gan.pulse2pulse` and `models.components` are re-export shims kept for one
-release.
+[Training with `ecgen train`](../training/runner.md)). The old root import paths `models.vae`,
+`models.vqvae`, `models.gan.pulse2pulse` and `models.components` were removed in 1.2.
 
 ## Package pattern
 

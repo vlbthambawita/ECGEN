@@ -13,7 +13,7 @@ add new libraries (no D3/Mermaid for these figures).
 ## Workflow
 
 1. **Read the code first, not the papers.** Take every shape, layer, default and loss term from
-   `models/<family>/`, `models/components/` and `training/losses/`. Trace the real tensor shapes
+   `src/ecgen/families/<family>/`, `src/ecgen/nn/` and the family's `losses.py`. Trace the real tensor shapes
    (strides, padding, which outputs are kept/discarded, what is `.detach()`ed, which optimizer
    steps). If the code deviates from the paper, draw what the code does and add a `!!! note`.
 2. **Read an existing page** as the template — `docs/visual/vqvae.md` covers almost every

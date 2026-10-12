@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-ECGEN is a research framework for generative modeling of 12-lead ECGs (MIMIC-IV-ECG; PTB-XL planned), built on PyTorch Lightning. Implemented model families: VAE, VQ-VAE + PixelCNN prior, and Pulse2Pulse GAN. `models/diffusion/` and `models/ssm/` are placeholders.
+ECGEN is a research framework for generative modeling of 12-lead ECGs (MIMIC-IV-ECG, PTB-XL), built on PyTorch Lightning. Model families (all conditional-capable): VAE, VQ-VAE + PixelCNN prior, Pulse2Pulse GAN, diffusion and flow matching (pixel and latent space).
 
 The repo also ships the `ecgen` package (`src/ecgen/`) published to PyPI — `ecgen.generate`, `ecgen.plot_ecg`, and HF upload helpers; see "Published `ecgen` package" below.
 
@@ -34,11 +34,11 @@ Training runs on GPU against MIMIC-IV-ECG at a hard-coded cluster path (`data.da
 
 ## Architecture
 
-`PLAN_TRAINING_LIBRARY.md` is the roadmap (Phase 0 — contracts, registry, runner — is done; conditioning, diffusion, flow matching come next). Read §3–§7 before adding a family, conditioner, or dataset.
+`PLAN_TRAINING_LIBRARY.md` is the roadmap; Phases 0–8 are done (released as v1.1.0) and the shims were removed afterwards. Read §3–§7 before adding a family, conditioner, or dataset.
 
 **Where code lives.**
 - **`src/ecgen/` (imported as `ecgen.*`, the published package)** now holds the training stack: `ecgen.families.{vae,vqvae,gan}` (Lightning modules, configs, losses), `ecgen.families.base` (`GenerativeModule`, `Capabilities`), `ecgen.nn` (shared conv blocks), `ecgen.data` (datasets, `ECGDataModule`, collation, lead handling, `FeatureNormalizer`), `ecgen.training.{runner,callbacks}`, `ecgen.registry`, `ecgen.types`, `ecgen.cli`, plus `generate`/`plot`/`f`.
-- **Top-level `models/`, `training/callbacks|losses`, `utils/`, `data/datasets/{base,mimic}`** are now one-line re-export shims to the `ecgen.*` modules, kept for one release — edit the `ecgen.*` file, not the shim. `ecgen.models.{vae,pulse2pulse}` are shims too. Still-real top-level code: `evaluation/`, `visualization/`, `training/metrics/`, `training/losses/common.py`, `scripts/`. Don't add top-level packages to the wheel — their generic names (`models`, `data`, `utils`) would clash in site-packages.
+- **Top-level research code** (not installed): `evaluation/`, `visualization/`, `training/metrics/`, `training/losses/common.py`, `scripts/`. The old root shim packages (`models/`, `data/`, `utils/`, `training/callbacks|trainers`) were removed after the v1.1.0 release; import from `ecgen.*`. `ecgen.models.{vae,pulse2pulse}` is a deprecated alias of `ecgen.families` that warns on import (removal in 2.0) — don't import it from library code. Don't add top-level packages to the wheel — their generic names (`models`, `data`, `utils`) would clash in site-packages.
 - **Legacy tuple loaders** `ecgen.data.mimic_dataset.MIMICIVECGDataset` and `ecgen.data.pulse2pulse_mimic` remain for old scripts; new code uses `ecgen.data.datasets.MIMICIVECG`.
 - **`single_file/`:** a self-contained VQ-VAE (both stages) in `train_vqvae_standalone.py`; independent of the package — changes to `ecgen.families.vqvae` are not reflected there and vice versa.
 

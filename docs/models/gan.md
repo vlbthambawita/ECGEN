@@ -18,8 +18,8 @@ For training and sample generation, see [Pulse2Pulse Training](../training/pulse
 
 `src/ecgen/families/gan/pulse2pulse.py` (`ecgen.families.gan.pulse2pulse`, also exported from
 `ecgen.families.gan`), registered with the training runner as **`pulse2pulse`**. The old import
-paths `models.gan.pulse2pulse` and `ecgen.models.pulse2pulse` are re-export shims kept for one
-release; `scripts/generate/generate_pulse2pulse.py` still imports through `models.gan.pulse2pulse`.
+path `models.gan.pulse2pulse` was removed in 1.2; `ecgen.models.pulse2pulse` still works but is
+deprecated (removed in 2.0).
 
 ```python
 from ecgen.families.gan import Pulse2PulseGAN, Pulse2PulseConfig

@@ -262,7 +262,7 @@ These scripts are fully integrated with the ECGEN framework:
 
 ```python
 # Import paths work correctly
-from ecgen.models.vae import VAELightning, VAEConfig
+from ecgen.families.vae import VAELightning, VAEConfig
 from ecgen.data.mimic_dataset import MIMICIVECGDataset
 from ecgen.utils.seed import set_global_seed
 ```
@@ -323,7 +323,7 @@ After training:
 
 1. **Load checkpoint**:
 ```python
-from ecgen.models.vae import VAELightning
+from ecgen.families.vae import VAELightning
 model = VAELightning.load_from_checkpoint(
     "runs/vae_mimic/seed_42/checkpoints/last.ckpt"
 )

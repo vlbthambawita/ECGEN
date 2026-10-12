@@ -14,7 +14,7 @@ DataModules were removed.
 | `scripts/shell/run_train_pulse2pulse_mimic.sh [config] [overrides]` | Pulse2Pulse (`pulse2pulse_mimic.yaml`) |
 | `scripts/shell/run_train_pulse2pulse_standalone.sh` | Pulse2Pulse, settings from env vars `DATA_DIR`, `EXP_NAME`, `BATCH_SIZE`, `MAX_EPOCHS`, `GPU_ID`, `NUM_WORKERS` |
 | `scripts/shell/run_sweep.sh [overrides]` | Every `configs/experiments/*.yaml` except the prior, then the prior on `runs/vqvae_mimic/seed_42/checkpoints/last.ckpt` if it exists |
-| `training/trainers/gan_trainer.py --config <yaml>`, `python -m ecgen.training.train --config <yaml>` | Deprecated wrappers that call the runner |
+| `python -m ecgen.training.train --config <yaml>` | Deprecated wrapper that calls the runner |
 | `single_file/run_train_vqvae.sh` → `single_file/train_vqvae_standalone.py --stage {1,2}` | Self-contained VQ-VAE (both stages), flags/env vars only, no package imports |
 
 All wrappers in `scripts/shell/` first `cd` to the repository root, so they can be run from anywhere,

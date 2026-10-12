@@ -5,8 +5,8 @@ Samples decoded from the VQ-VAE and the PixelCNN prior must have the requested l
 import pytest
 import torch
 
-from models.vqvae import PriorLightning, VQVAEConfig, VQVAELightning
-from models.vqvae.config import PriorConfig
+from ecgen.families.vqvae import PriorLightning, VQVAEConfig, VQVAELightning
+from ecgen.families.vqvae.config import PriorConfig
 
 SMALL = dict(base_channels=16, latent_channels=8, num_embeddings=32)
 

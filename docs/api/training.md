@@ -53,11 +53,3 @@ Auto-generated from docstrings.
 ## `training.metrics.clinical`
 
 ::: training.metrics.clinical
-
-## `training.trainers.base_trainer`
-
-::: training.trainers.base_trainer
-
-## `training.trainers.vae_trainer`
-
-::: training.trainers.vae_trainer

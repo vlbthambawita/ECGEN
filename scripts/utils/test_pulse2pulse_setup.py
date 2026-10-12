@@ -11,7 +11,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import torch
-from ecgen.models.pulse2pulse import (
+from ecgen.families.gan.pulse2pulse import (
     Pulse2PulseGAN,
     Pulse2PulseConfig,
     WaveGANGenerator,

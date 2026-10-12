@@ -138,7 +138,7 @@ def _load_generator(
     model_size: int,
     device: torch.device,
 ) -> torch.nn.Module:
-    from ecgen.models.pulse2pulse import WaveGANGenerator
+    from ecgen.families.gan import WaveGANGenerator
 
     ckpt = torch.load(checkpoint_path, map_location="cpu")
 

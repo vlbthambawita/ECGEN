@@ -86,7 +86,7 @@ Each family keeps its loss next to its model:
 | `ecgen.families.gan.losses` | `wgan_discriminator_loss`, `wgan_generator_loss`, `adversarial_loss`, `least_squares_discriminator_loss`, `least_squares_generator_loss` |
 | `training/losses/common.py` | `mse_loss`, `l1_loss` |
 
-The old `training/losses/{vae,vqvae,gan}_losses.py` modules re-export these for one release.
+The old `training/losses/{vae,vqvae,gan}_losses.py` re-exports were removed in 1.2.
 
 ### Metrics — `training/metrics/`
 
@@ -98,11 +98,6 @@ The old `training/losses/{vae,vqvae,gan}_losses.py` modules re-export these for 
 
 Evaluation metrics for generated samples live in the separate `evaluation/` package; see
 [Evaluation metrics](../evaluation/metrics.md).
-
-### Trainers — `training/trainers/`
-
-- `gan_trainer.py`: deprecated; forwards `--config <yaml>` to the runner (`ecgen.training.train`).
-- `base_trainer.py`, `vae_trainer.py`: placeholder classes.
 
 ## Monitoring
 

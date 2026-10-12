@@ -1,4 +1,11 @@
-# Changes Summary - Generative Training Library, Phases 1–8 (Unreleased)
+# Unreleased
+
+- **Removed the compatibility shims** (planned for after one release). The root packages `models/`, `data/` and `utils/`, `training/callbacks/`, `training/trainers/`, `training/losses/{vae,vqvae,gan}_losses.py`, and `verify_reorganization.py` are gone; import from `ecgen.*` (table in [Project structure](project_structure.md#removed-import-paths)). Checkpoints are unaffected: they store hyperparameters, not module paths, and the existing `runs/` checkpoints load unchanged.
+- **`ecgen.models` is deprecated.** It still re-exports `ecgen.families` (it is part of the published API) but now emits a `DeprecationWarning`; removal in 2.0. `ecgen.generate` no longer imports through it.
+
+---
+
+# v1.1.0 - Generative Training Library, Phases 1–8
 
 Phases 1–8 of `PLAN_TRAINING_LIBRARY.md`, on top of Phase 0 below.
 
@@ -12,7 +19,7 @@ Phases 1–8 of `PLAN_TRAINING_LIBRARY.md`, on top of Phase 0 below.
 
 ---
 
-# Changes Summary - Training Moved Into the `ecgen` Package (Unreleased)
+# v1.1.0 - Training Moved Into the `ecgen` Package (Phase 0)
 
 ## Overview
 
@@ -32,7 +39,7 @@ Phase 0 of `PLAN_TRAINING_LIBRARY.md`. Training is now part of the published `ec
 - **`scripts/train/train_vae_mimic.py`, `train_vqvae_mimic.py`, `train_prior_mimic.py`, `train_pulse2pulse.py`** (DELETED) — and their inline DataModules and `VAEDataWrapper`; use `ecgen train configs/experiments/<name>.yaml`
 - **`data/datasets/mimic/datamodule.py`** (DELETED) — and the old dataclass placeholder in `src/ecgen/data/datamodule.py`; both replaced by the generic `ecgen.data.datamodule.ECGDataModule`
 
-## Moved Files (old paths are re-export shims for one release)
+## Moved Files (old paths were re-export shims in 1.1.0, removed afterwards)
 
 - `models/vae/*` → `ecgen.families.vae`; `models/vqvae/*` → `ecgen.families.vqvae`; `models/gan/pulse2pulse.py` → `ecgen.families.gan.pulse2pulse`
 - `training/losses/{vae,vqvae,gan}_losses.py` → `ecgen.families.{vae,vqvae,gan}.losses`

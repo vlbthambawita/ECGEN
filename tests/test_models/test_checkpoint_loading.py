@@ -9,10 +9,10 @@ import pytest
 import pytorch_lightning as pl
 import torch
 
-from models.gan.pulse2pulse import Pulse2PulseConfig, Pulse2PulseGAN
-from models.vae import VAEConfig, VAELightning
-from models.vqvae import PriorLightning, VQVAEConfig, VQVAELightning
-from models.vqvae.config import PriorConfig
+from ecgen.families.gan.pulse2pulse import Pulse2PulseConfig, Pulse2PulseGAN
+from ecgen.families.vae import VAEConfig, VAELightning
+from ecgen.families.vqvae import PriorLightning, VQVAEConfig, VQVAELightning
+from ecgen.families.vqvae.config import PriorConfig
 
 SMALL_VQVAE = VQVAEConfig(base_channels=16, latent_channels=8, num_embeddings=32)
 

@@ -2,10 +2,10 @@
 
 `pip install -e .` installs one package, **`ecgen`** (`src/ecgen/`), plus the `ecgen` command. It
 holds the model families, datasets, the training runner and the published generation/plotting
-helpers. The research packages at the repository root (`models`, `data`, `training`, `evaluation`,
-`utils`, `visualization`) are **not** installed; run code that uses them from the repo root. Several
-of their modules are now one-line re-export shims of `ecgen` modules (see
-[below](#compatibility-shims)).
+helpers. The research packages at the repository root (`training`,
+`evaluation`, `visualization`) are **not** installed; run code that uses them from the repo root.
+The old `models`, `data`, `utils`, `training/callbacks` and `training/trainers` packages were
+removed in 1.2 (see [below](#removed-import-paths)).
 
 ## Directory layout
 
@@ -36,21 +36,16 @@ ECGEN/
 │   ├── utils/                      # config.py, seed.py, io.py, logging.py, metadata.py
 │   ├── generate.py, plot.py        # ecgen.generate, ecgen.plot_ecg
 │   ├── f/                          # Hugging Face upload helpers
-│   └── models/                     # deprecated shims to ecgen.families
+│   └── models/                     # deprecated alias of ecgen.families (warns; removed in 2.0)
 │
-├── models/                         # shims (vae/, vqvae/, gan/, components/); diffusion/, ssm/ placeholders
-├── data/datasets/                  # shims: base.py, mimic/dataset.py, mimic/pulse2pulse_datamodule.py
 ├── training/
-│   ├── callbacks/                  # shims to ecgen.training.callbacks
-│   ├── losses/                     # common.py; *_losses.py are shims to ecgen.families.*.losses
-│   ├── metrics/                    # reconstruction.py, generation.py, clinical.py
-│   └── trainers/                   # gan_trainer.py (deprecated wrapper), base/vae placeholders
+│   ├── losses/                     # common.py (mse_loss, l1_loss)
+│   └── metrics/                    # reconstruction.py, generation.py, clinical.py
 ├── evaluation/
 │   ├── metrics/                    # fidelity.py, diversity.py, signal_quality.py
 │   ├── benchmark.py                # ModelBenchmark
 │   └── visualize.py                # plot_evaluation_results, plot_comparison_matrix
 ├── visualization/                  # ecg_plots.py, latent_space.py, training_curves.py
-├── utils/                          # shims to ecgen.utils
 │
 ├── configs/
 │   ├── experiments/                # vae_mimic, vqvae_mimic, prior_mimic, pulse2pulse_mimic (.yaml)
@@ -106,9 +101,10 @@ from ecgen.utils.seed import set_global_seed
 from visualization import plot_ecg_leads, plot_latent_space_2d   # from the repo root
 ```
 
-## Compatibility shims
+## Removed import paths
 
-These old paths re-export the moved modules and will be removed after one release:
+These paths re-exported the moved modules in 1.1.0 and were removed in 1.2. `ecgen.models` is
+still importable but emits a `DeprecationWarning` and will be removed in 2.0.
 
 | Old import | New import |
 |---|---|
@@ -122,8 +118,8 @@ These old paths re-export the moved modules and will be removed after one releas
 | `data.datasets.base` | `ecgen.data.datasets.base` |
 | `data.datasets.mimic.dataset`, `data.datasets.mimic.pulse2pulse_datamodule` | legacy `ecgen.data.mimic_dataset`, `ecgen.data.pulse2pulse_mimic` |
 
-`training/trainers/gan_trainer.py` and `ecgen.training.train` are deprecated wrappers around the
-runner.
+`training/trainers/gan_trainer.py` was removed; `python -m ecgen.training.train --config` is a
+deprecated wrapper around the runner.
 
 ## Run outputs
 

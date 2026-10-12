@@ -36,12 +36,11 @@ pip install -e ".[dev]"     # + pytest, black, flake8, mypy
 
 Only the `ecgen` package in `src/ecgen/` is installed. It contains the model families
 (`ecgen.families.*`), datasets (`ecgen.data.*`), the training runner (`ecgen.training.runner`) and
-the `ecgen` console script. The research packages at the repository root (`models`, `data`,
-`training`, `evaluation`, `utils`, `visualization`) are **not** installed: run code that imports
-them from the repo root (pytest adds the root via `pythonpath = ["."]`). Their moved modules
-(`models.vae`, `models.vqvae`, `models.gan.pulse2pulse`, `models.components`, `training.callbacks`,
-`training.losses.*_losses`, `utils.*`) are re-export shims of the `ecgen` modules, kept for one
-release.
+the `ecgen` console script. The research packages at the repository root (`training`,
+`evaluation`, `visualization`) are **not** installed: run code that imports them from the repo root
+(pytest adds the root via `pythonpath = ["."]`). The old root packages `models`, `data` and `utils`
+were removed in 1.2; import from `ecgen.*` instead (see the
+[migration table](../project_structure.md#removed-import-paths)).
 
 ### 3. Verify the installation
 

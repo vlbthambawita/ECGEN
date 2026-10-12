@@ -12,7 +12,6 @@ from ecgen.training.callbacks import (
 )
 ```
 
-(`training.callbacks` at the repo root re-exports them for one release.)
 `ecgen.training.callbacks.checkpointing` (`CustomCheckpointCallback`) and
 `ecgen.training.callbacks.logging` (`CustomLoggingCallback`) are empty placeholders.
 

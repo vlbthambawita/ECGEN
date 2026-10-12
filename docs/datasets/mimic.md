@@ -5,8 +5,7 @@
 The loader is `ecgen.data.datasets.MIMICIVECG` ([`src/ecgen/data/datasets/mimic.py`](https://github.com/vlbthambawita/ECGEN/blob/main/src/ecgen/data/datasets/mimic.py)), registered as **`mimic_iv_ecg`**. It follows the [`BaseECGDataset`](custom.md) dict contract and is wrapped by the generic `ecgen.data.datamodule.ECGDataModule`, which the training runner builds from the `data:` section of an experiment YAML. API details are in the [Data API reference](../api/data.md).
 
 !!! note "Legacy loader"
-    The older tuple-returning `ecgen.data.mimic_dataset.MIMICIVECGDataset` (re-exported by
-    `data/datasets/mimic/dataset.py`) and `ecgen.data.pulse2pulse_mimic` are still present for
+    The older tuple-returning `ecgen.data.mimic_dataset.MIMICIVECGDataset` and `ecgen.data.pulse2pulse_mimic` are still present for
     legacy scripts such as `scripts/utils/test_pulse2pulse_setup.py`, but no training path uses them.
     With default parameters `MIMICIVECG` reproduces the legacy dataset's records, splits and
     signals exactly.

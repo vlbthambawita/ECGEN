@@ -64,7 +64,7 @@ pip install 'ecgen[hf]'
 **Loss:** `reconstruction_loss + kl_weight × KL_divergence`
 
 ```python
-from ecgen.models import VAELightning, VAEConfig
+from ecgen.families.vae import VAELightning, VAEConfig
 
 config = VAEConfig(
     in_channels=12,
@@ -86,7 +86,7 @@ samples = model.sample(n_samples=16, seq_length=5000)  # (16, 12, 5000)
 Wasserstein GAN with gradient penalty for conditional ECG generation. Uses the first 8 leads of MIMIC-IV-ECG signals.
 
 ```python
-from ecgen.models import Pulse2PulseGAN, Pulse2PulseConfig
+from ecgen.families.gan import Pulse2PulseGAN, Pulse2PulseConfig
 
 config = Pulse2PulseConfig(
     model_size=50,
@@ -222,7 +222,8 @@ Run outputs are saved to `runs/{experiment_name}/seed_{seed}/` containing:
 
 ### Config format
 
-All experiments use a YAML config with `target` + `params` for dynamic instantiation:
+Components are built from a registry `name` (`ecgen list`) or an import-path `target`, with
+`params` passed to the constructor:
 
 ```yaml
 experiment:
@@ -230,19 +231,19 @@ experiment:
   seed: 42
 
 model:
-  target: ecgen.models.vae.VAELightning
+  name: vae                 # or target: ecgen.families.vae.VAELightning
   params:
-    config:
-      in_channels: 12
-      latent_channels: 8
-      kl_weight: 0.0001
+    in_channels: 12
+    latent_channels: 8
+    kl_weight: 0.0001
 
 data:
-  target: ecgen.data.mimic_dataset.MIMICIVECGDataset
-  params:
-    mimic_path: /path/to/mimic-iv-ecg
-    batch_size: 32
-    max_samples: null   # null = full dataset
+  dataset:
+    name: mimic_iv_ecg
+    params:
+      root: /path/to/mimic-iv-ecg
+      max_samples: null     # null = full dataset
+  batch_size: 32
 
 trainer:
   max_epochs: 100
@@ -302,7 +303,7 @@ src/ecgen/
 ├── training/       — runner, callbacks, EMA
 ├── evaluation/     — measurements, distribution / adherence / reconstruction metrics, classifier
 ├── generate.py     — legacy Pulse2Pulse generator; plot.py — ECG plots; f/ — HF upload
-└── models/         — deprecated shims to families/
+└── models/         — deprecated alias of families/ (warns; removed in 2.0)
 ```
 
 ---

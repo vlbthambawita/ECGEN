@@ -1,8 +1,8 @@
 # Training
 
 Training metrics and older helpers. The runner, callbacks and family losses moved to the `ecgen`
-package (`ecgen.training.runner`, `ecgen.training.callbacks`, `ecgen.families.*.losses`); the files
-left in `callbacks/` and `losses/` are re-export shims kept for one release.
+package (`ecgen.training.runner`, `ecgen.training.callbacks`, `ecgen.families.*.losses`); their old
+re-exports here were removed in 1.2.
 
 ## Structure
 

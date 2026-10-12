@@ -3,7 +3,7 @@ Test script for VAE model
 """
 
 import torch
-from ecgen.models.vae import VAE1D, VAEConfig, VAELightning, vae_loss
+from ecgen.families.vae import VAE1D, VAEConfig, VAELightning, vae_loss
 
 
 def test_vae_forward():

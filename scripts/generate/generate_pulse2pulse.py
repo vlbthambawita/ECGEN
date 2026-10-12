@@ -16,7 +16,7 @@ import torch
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from models.gan.pulse2pulse import Pulse2PulseGAN
+from ecgen.families.gan.pulse2pulse import Pulse2PulseGAN
 
 LEAD_NAMES_8 = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2"]
 
