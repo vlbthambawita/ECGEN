@@ -1,0 +1,3435 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="ECG generation with VAE, VQ-VAE, GAN, Diffusion and State Space Models">
+      
+      
+      
+        <link rel="canonical" href="https://vajira.info/ECGEN/models/vqvae/">
+      
+      
+        <link rel="prev" href="../vae/">
+      
+      
+        <link rel="next" href="../gan/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>VQ-VAE + Prior - ECGEN</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/architecture.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#vq-vae-pixelcnn-prior" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ECGEN" class="md-header__button md-logo" aria-label="ECGEN" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7.5 4A5.5 5.5 0 0 0 2 9.5c0 .5.09 1 .22 1.5H6.3l1.27-3.37c.3-.8 1.48-.88 1.86 0L11.5 13l.59-1.42c.13-.33.48-.58.91-.58h8.78c.13-.5.22-1 .22-1.5A5.5 5.5 0 0 0 16.5 4c-1.86 0-3.5.93-4.5 2.34C11 4.93 9.36 4 7.5 4M3 12.5a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2.44L11 20c1 .9 1 .9 2 0l5.56-5.5H21a1 1 0 0 0 1-1 1 1 0 0 0-1-1h-7.6l-.93 2.3c-.4 1.01-1.55.87-1.92.03L8.5 9.5l-.96 2.33c-.15.38-.49.67-.94.67z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ECGEN
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              VQ-VAE + Prior
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="deep-orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="deep-orange"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/vlbthambawita/ECGEN" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vlbthambawita/ECGEN
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../concepts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Concepts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting_started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../datasets/mimic/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Datasets
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Models
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../visual/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Visual Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../training/runner/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Training
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../evaluation/metrics/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Evaluation & Visualization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../standalone/vqvae_standalone/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Standalone VQ-VAE
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../extending/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Extending ECGEN
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/models/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../project_structure/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ECGEN" class="md-nav__button md-logo" aria-label="ECGEN" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7.5 4A5.5 5.5 0 0 0 2 9.5c0 .5.09 1 .22 1.5H6.3l1.27-3.37c.3-.8 1.48-.88 1.86 0L11.5 13l.59-1.42c.13-.33.48-.58.91-.58h8.78c.13-.5.22-1 .22-1.5A5.5 5.5 0 0 0 16.5 4c-1.86 0-3.5.93-4.5 2.34C11 4.93 9.36 4 7.5 4M3 12.5a1 1 0 0 0-1 1 1 1 0 0 0 1 1h2.44L11 20c1 .9 1 .9 2 0l5.56-5.5H21a1 1 0 0 0 1-1 1 1 0 0 0-1-1h-7.6l-.93 2.3c-.4 1.01-1.55.87-1.92.03L8.5 9.5l-.96 2.33c-.15.38-.49.67-.94.67z"/></svg>
+
+    </a>
+    ECGEN
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/vlbthambawita/ECGEN" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vlbthambawita/ECGEN
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datasets/mimic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MIMIC-IV-ECG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datasets/ptbxl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PTB-XL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datasets/custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vae/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VAE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VQ-VAE + Prior
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VQ-VAE + Prior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encoder-and-decoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoder and decoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vector-quantizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector quantizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pixelcnn-prior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PixelCNN prior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shapes-and-downsampling-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shapes and downsampling factor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vqvaeconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VQVAEConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priorconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PriorConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#losses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Losses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lightning-wrappers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lightning wrappers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lightning wrappers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vqvaelightning-stage-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VQVAELightning (stage 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priorlightning-stage-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PriorLightning (stage 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-checkpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading checkpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-and-code-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction and code extraction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sampling-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sampling example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pulse2Pulse GAN
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion & Flow Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../visual/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visual Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visual Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visual/vae/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VAE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visual/vqvae/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VQ-VAE + Prior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visual/pulse2pulse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pulse2Pulse GAN
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visual/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion (DDPM)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visual/flow_matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Training
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training with ecgen train
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/conditioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/vae_training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VAE Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/vqvae_training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VQ-VAE Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/pulse2pulse_training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pulse2Pulse Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../training/scripts_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Entry Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation & Visualization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Evaluation & Visualization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../visualization/guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../standalone/vqvae_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standalone VQ-VAE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending ECGEN
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/conditioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../project_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reorganization_history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reorganization History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encoder-and-decoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoder and decoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vector-quantizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector quantizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pixelcnn-prior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PixelCNN prior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shapes-and-downsampling-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shapes and downsampling factor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vqvaeconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VQVAEConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priorconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PriorConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#losses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Losses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lightning-wrappers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lightning wrappers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lightning wrappers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vqvaelightning-stage-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VQVAELightning (stage 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priorlightning-stage-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PriorLightning (stage 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-checkpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading checkpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-and-code-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction and code extraction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sampling-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sampling example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/vlbthambawita/ECGEN/edit/main/docs/models/vqvae.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="vq-vae-pixelcnn-prior">VQ-VAE + PixelCNN Prior<a class="headerlink" href="#vq-vae-pixelcnn-prior" title="Permanent link">&para;</a></h1>
+<p>ECGEN's VQ-VAE is a two-stage generative model for 12-lead ECGs:</p>
+<div class="admonition tip">
+<p class="admonition-title">Visual guide</p>
+<p>For animated diagrams of the input, architecture, output and loss, see the
+<a href="../../visual/vqvae/">visual guide</a>.</p>
+</div>
+<ol>
+<li><strong>Stage 1 – VQ-VAE</strong> (<code>VQVAELightning</code>): a 1D convolutional autoencoder whose
+   latent is snapped to the nearest entry of a learned codebook, so each ECG becomes a
+   sequence of discrete code indices.</li>
+<li><strong>Stage 2 – PixelCNN prior</strong> (<code>PriorLightning</code>): an autoregressive model over those
+   code indices, trained while the stage-1 model stays frozen.</li>
+</ol>
+<p>To generate, the prior samples a sequence of code indices and the VQ-VAE decoder turns
+it into an ECG.</p>
+<p>All classes live in <code>src/ecgen/families/vqvae/</code> and are exported from <code>ecgen.families.vqvae</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ecgen.families.vqvae</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">VQVAEConfig</span><span class="p">,</span> <span class="n">PriorConfig</span><span class="p">,</span>            <span class="c1"># dataclass configs</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">VQVAE1D</span><span class="p">,</span> <span class="n">VectorQuantizer</span><span class="p">,</span>            <span class="c1"># plain nn.Modules (stage 1)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">PixelCNNPrior</span><span class="p">,</span> <span class="n">CausalGatedBlock</span><span class="p">,</span>     <span class="c1"># plain nn.Modules (stage 2)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">VQVAELightning</span><span class="p">,</span> <span class="n">PriorLightning</span><span class="p">,</span>      <span class="c1"># LightningModule wrappers</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</code></pre></div>
+<p>For training instructions, see <a href="../../training/vqvae_training/">VQ-VAE Training</a>. For the
+generated API reference, see <a href="../../api/models/">Models API</a>.</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    X["ECG&lt;br/&gt;[B, 12, 5000]"] --&gt; E["Encoder1D"]
+    E --&gt;|"z [B, 64, 625]"| VQ["VectorQuantizer&lt;br/&gt;codebook 512 x 64"]
+    VQ --&gt;|"z_q [B, 64, 625]"| D["Decoder1D"]
+    D --&gt; R["Reconstruction&lt;br/&gt;[B, 12, 5000]"]
+    VQ -.-&gt;|"indices [B, 625]"| P["PixelCNNPrior&lt;br/&gt;(stage 2)"]
+    P -.-&gt;|"sampled indices"| VQ</code></pre>
+<h3 id="encoder-and-decoder">Encoder and decoder<a class="headerlink" href="#encoder-and-decoder" title="Permanent link">&para;</a></h3>
+<p><code>VQVAE1D</code> reuses the shared <code>Encoder1D</code> / <code>Decoder1D</code> from <code>src/ecgen/nn/</code>, the same
+blocks that the <a href="../vae/">VAE</a> uses:</p>
+<ul>
+<li><strong><code>ResidualBlock1D</code></strong> (<code>src/ecgen/nn/blocks.py</code>): two <code>Conv1d(k=3)</code> → <code>GroupNorm(8)</code> → SiLU
+  layers with a residual shortcut (a 1×1 conv when the channel count changes).</li>
+<li><strong><code>Encoder1D</code></strong>: <code>Conv1d(k=7)</code> stem, then for each entry in <code>channel_multipliers</code>, <code>num_res_blocks</code>
+  residual blocks at <code>base_channels * mult</code> channels. A stride-2 <code>Conv1d(k=4)</code> follows every
+  stage except the last. Then two mid residual blocks, GroupNorm, SiLU, and a <code>Conv1d</code> to
+  <code>2 * latent_channels</code>, which is split into <code>(mean, logvar)</code>.</li>
+<li><strong><code>Decoder1D</code></strong>: the mirror image. It uses <code>ConvTranspose1d(k=4, stride=2)</code> upsampling and a
+  <code>Conv1d(k=7)</code> output to <code>in_channels</code> leads.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Only the first half of the encoder output is used</p>
+<p><code>Encoder1D</code> was written for the VAE and returns <code>(mean, logvar)</code>. <code>VQVAE1D.encode()</code> keeps
+only <code>mean</code> as the continuous latent <code>z</code> and discards <code>logvar</code>. It returns <code>(z, z)</code> so the
+API matches the VAE's.</p>
+</div>
+<h3 id="vector-quantizer">Vector quantizer<a class="headerlink" href="#vector-quantizer" title="Permanent link">&para;</a></h3>
+<p><code>VectorQuantizer(num_embeddings, embedding_dim, commitment_cost)</code> (<code>src/ecgen/families/vqvae/vector_quantizer.py</code>)
+works as follows:</p>
+<ul>
+<li>It holds an <code>nn.Embedding(num_embeddings, embedding_dim)</code> codebook, initialised uniformly in
+  <code>[-1/K, 1/K]</code>.</li>
+<li>It finds the nearest codebook vector (L2 distance) for every latent time step.</li>
+<li>It computes <code>vq_loss = mse(sg[z_q], z) + commitment_cost * mse(z_q, sg[z])</code>, where <code>sg</code> is
+  stop-gradient. In this formula the first term updates the encoder and the second term updates
+  the codebook. The original VQ-VAE paper does the opposite: it puts β on the encoder
+  (commitment) term. Here β = <code>commitment_cost</code> scales the codebook term, even though the code
+  comments call it the commitment loss.</li>
+<li>It passes gradients to the encoder with the straight-through estimator: <code>z_q = z + (z_q - z).detach()</code>.</li>
+<li><code>forward(z)</code> returns <code>(vq_loss, quantized [B, C, L], indices [B, L])</code>.</li>
+<li><code>get_codebook_entry(indices)</code> maps <code>[B, L]</code> indices back to <code>[B, C, L]</code> vectors.</li>
+</ul>
+<p><code>embedding_dim</code> is set to <code>latent_channels</code>.</p>
+<h3 id="pixelcnn-prior">PixelCNN prior<a class="headerlink" href="#pixelcnn-prior" title="Permanent link">&para;</a></h3>
+<p><code>PixelCNNPrior(num_embeddings=512, hidden_dim=128, num_layers=10, kernel_size=2, dilation_cycle=10)</code>
+(<code>src/ecgen/families/vqvae/pixelcnn_prior.py</code>) is a WaveNet-style stack of causal dilated convolutions. It
+has these parts:</p>
+<ul>
+<li><code>nn.Embedding(num_embeddings, hidden_dim)</code> turns code indices into vectors.</li>
+<li>The embedded sequence is shifted right by one position (zeros at <code>t = 0</code>), so position <code>t</code>
+  only sees codes <code>&lt; t</code>.</li>
+<li><code>num_layers</code> <code>CausalGatedBlock(hidden_dim, kernel_size, dilation)</code> blocks. Block <code>i</code> uses
+  dilation <code>2 ** (i % dilation_cycle)</code>, so with the defaults the dilations are 1, 2, 4, …, 512.
+  Each block left-pads its input by <code>(kernel_size - 1) * dilation</code>, applies a causal dilated
+  conv with the gated activation <code>tanh(W_f * x) * sigmoid(W_g * x)</code>, and produces a 1×1
+  residual output (added to the block input) and a 1×1 skip output.</li>
+<li>The skip outputs of all blocks are summed and passed through a head: ReLU, 1×1 <code>Conv1d</code>,
+  ReLU, 1×1 <code>Conv1d</code> to <code>num_embeddings</code> logits.</li>
+<li><code>forward(indices [B, L])</code> returns <code>logits [B, num_embeddings, L]</code>. The logit at position <code>t</code>
+  predicts code <code>t</code> from codes <code>&lt; t</code>.</li>
+<li><code>receptive_field</code> returns <code>1 + sum((kernel_size - 1) * d)</code> over the block dilations: <strong>1024</strong>
+  codes with the defaults, which covers all 625 codes of a 5000-sample ECG.</li>
+<li><code>sample(batch_size=1, latent_length=625, temperature=1.0, device="cuda")</code> fills a zero tensor
+  one position at a time, drawing each code from <code>softmax(logits / temperature)</code>. Each step only
+  feeds the last <code>receptive_field</code> codes to the network (<code>indices[:, start:i+1]</code>), which gives
+  the same result as feeding the full context.</li>
+</ul>
+<p>Training and sampling use the logits the same way: logit <code>t</code> is trained to predict code <code>t</code>
+(see <code>PriorLightning.compute_loss</code> below), and sampling draws code <code>t</code> from logit <code>t</code>.</p>
+<h2 id="shapes-and-downsampling-factor">Shapes and downsampling factor<a class="headerlink" href="#shapes-and-downsampling-factor" title="Permanent link">&para;</a></h2>
+<p>The encoder has <code>len(channel_multipliers)</code> stages, but only the first <code>len - 1</code> stages
+downsample. Each stride-2 conv halves the length, so:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>downsampling factor = 2 ** (len(channel_multipliers) - 1)
+</code></pre></div>
+<p>With the default <code>(1, 2, 4, 4)</code> the factor is <strong>8</strong>, which gives these shapes:</p>
+<table>
+<thead>
+<tr>
+<th>Tensor</th>
+<th>Shape (defaults, <code>seq_length=5000</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input ECG</td>
+<td><code>[B, 12, 5000]</code></td>
+</tr>
+<tr>
+<td>Continuous latent <code>z</code></td>
+<td><code>[B, 64, 625]</code></td>
+</tr>
+<tr>
+<td>Quantized latent <code>z_q</code></td>
+<td><code>[B, 64, 625]</code></td>
+</tr>
+<tr>
+<td>Code indices</td>
+<td><code>[B, 625]</code> (values in <code>[0, 512)</code>)</td>
+</tr>
+<tr>
+<td>Prior logits</td>
+<td><code>[B, 512, 625]</code></td>
+</tr>
+<tr>
+<td>Reconstruction</td>
+<td><code>[B, 12, 5000]</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>seq_length</code> should be divisible by the factor, or the reconstruction will be shorter than
+the input.</p>
+<p><code>VQVAELightning.downsample_factor</code> returns this factor, and
+<code>VQVAELightning.latent_length(seq_length)</code> returns <code>seq_length // factor</code>. It raises
+<code>ValueError</code> if <code>seq_length</code> is not a multiple of the factor. <code>VQVAELightning.sample()</code> and
+<code>PriorLightning.sample()</code> both use it, so samples always have the requested length.</p>
+<p>With the default config, the stage-1 model has about 6.38 M parameters and the PixelCNN prior
+has about 1.14 M (1,136,256).</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>Both configs are dataclasses in <code>src/ecgen/families/vqvae/config.py</code>. The Lightning wrappers accept the
+dataclass, a plain <code>dict</code> (converted with <code>Config(**dict)</code>), or the fields as flat keyword
+arguments (<code>VQVAELightning(num_embeddings=256)</code>), which is what <code>load_from_checkpoint</code> uses.</p>
+<h3 id="vqvaeconfig"><code>VQVAEConfig</code><a class="headerlink" href="#vqvaeconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>in_channels</code></td>
+<td><code>int</code></td>
+<td><code>12</code></td>
+<td>Number of ECG leads (input and output channels)</td>
+</tr>
+<tr>
+<td><code>base_channels</code></td>
+<td><code>int</code></td>
+<td><code>64</code></td>
+<td>Channel width of the first encoder stage</td>
+</tr>
+<tr>
+<td><code>latent_channels</code></td>
+<td><code>int</code></td>
+<td><code>64</code></td>
+<td>Latent channels, which is also the codebook embedding dim</td>
+</tr>
+<tr>
+<td><code>channel_multipliers</code></td>
+<td><code>tuple[int, ...]</code></td>
+<td><code>(1, 2, 4, 4)</code></td>
+<td>Per-stage width multipliers. <code>len - 1</code> sets the number of ×2 downsamplings</td>
+</tr>
+<tr>
+<td><code>num_res_blocks</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+<td>Residual blocks per stage</td>
+</tr>
+<tr>
+<td><code>num_embeddings</code></td>
+<td><code>int</code></td>
+<td><code>512</code></td>
+<td>Codebook size <code>K</code></td>
+</tr>
+<tr>
+<td><code>commitment_cost</code></td>
+<td><code>float</code></td>
+<td><code>0.25</code></td>
+<td>Weight β in the VQ loss</td>
+</tr>
+<tr>
+<td><code>lr</code></td>
+<td><code>float</code></td>
+<td><code>1e-4</code></td>
+<td>Adam learning rate</td>
+</tr>
+<tr>
+<td><code>b1</code></td>
+<td><code>float</code></td>
+<td><code>0.9</code></td>
+<td>Adam β1</td>
+</tr>
+<tr>
+<td><code>b2</code></td>
+<td><code>float</code></td>
+<td><code>0.999</code></td>
+<td>Adam β2</td>
+</tr>
+</tbody>
+</table>
+<h3 id="priorconfig"><code>PriorConfig</code><a class="headerlink" href="#priorconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>num_embeddings</code></td>
+<td><code>int</code></td>
+<td><code>512</code></td>
+<td>Vocabulary size. <strong>Must equal the VQ-VAE's <code>num_embeddings</code></strong></td>
+</tr>
+<tr>
+<td><code>hidden_dim</code></td>
+<td><code>int</code></td>
+<td><code>128</code></td>
+<td>Embedding and conv width of the PixelCNN</td>
+</tr>
+<tr>
+<td><code>num_layers</code></td>
+<td><code>int</code></td>
+<td><code>10</code></td>
+<td>Number of <code>CausalGatedBlock</code> layers</td>
+</tr>
+<tr>
+<td><code>kernel_size</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+<td>Kernel size of the causal convolutions</td>
+</tr>
+<tr>
+<td><code>dilation_cycle</code></td>
+<td><code>int</code></td>
+<td><code>10</code></td>
+<td>Layer <code>i</code> uses dilation <code>2 ** (i % dilation_cycle)</code>. The defaults give dilations 1 … 512 and a receptive field of 1024 codes</td>
+</tr>
+<tr>
+<td><code>lr</code></td>
+<td><code>float</code></td>
+<td><code>1e-3</code></td>
+<td>Adam learning rate</td>
+</tr>
+<tr>
+<td><code>b1</code></td>
+<td><code>float</code></td>
+<td><code>0.9</code></td>
+<td>Adam β1</td>
+</tr>
+<tr>
+<td><code>b2</code></td>
+<td><code>float</code></td>
+<td><code>0.999</code></td>
+<td>Adam β2</td>
+</tr>
+<tr>
+<td><code>vqvae_checkpoint</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Path to the stage-1 checkpoint. If non-empty (and <code>vqvae_config</code> is unset), it is loaded and frozen in <code>__init__</code></td>
+</tr>
+<tr>
+<td><code>vqvae_config</code></td>
+<td><code>dict \| None</code></td>
+<td><code>None</code></td>
+<td>The VQ-VAE's config fields. Filled in automatically when <code>vqvae_checkpoint</code> is loaded, so prior checkpoints can be restored without the stage-1 file. If set, <code>__init__</code> builds the VQ-VAE from it instead of reading <code>vqvae_checkpoint</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>configs/model/vqvae/vqvae_1d_base.yaml</code> and <code>configs/model/vqvae/prior_base.yaml</code> list the
+same defaults as YAML fragments. See <a href="../../training/vqvae_training/#configuration">VQ-VAE Training</a>
+for how the experiment YAMLs are wired.</p>
+<h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>
+<p>Both losses live in <code>src/ecgen/families/vqvae/losses.py</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Signature</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vqvae_loss</code></td>
+<td><code>(recon, x, vq_loss) -&gt; (total, recon_loss, vq_loss)</code></td>
+<td><code>recon_loss = mse(recon, x)</code> (mean). <code>total = recon_loss + vq_loss</code>. There is no KL term</td>
+</tr>
+<tr>
+<td><code>prior_loss</code></td>
+<td><code>(logits [B, K, L], targets [B, L]) -&gt; loss</code></td>
+<td>Mean cross-entropy over all positions</td>
+</tr>
+</tbody>
+</table>
+<p><code>vq_loss</code> is the codebook + commitment loss returned by <code>VectorQuantizer</code>. The total loss has
+no extra weight on it.</p>
+<h2 id="lightning-wrappers">Lightning wrappers<a class="headerlink" href="#lightning-wrappers" title="Permanent link">&para;</a></h2>
+<h3 id="vqvaelightning-stage-1"><code>VQVAELightning</code> (stage 1)<a class="headerlink" href="#vqvaelightning-stage-1" title="Permanent link">&para;</a></h3>
+<p><code>src/ecgen/families/vqvae/vqvae_lightning.py</code>. Constructed as <code>VQVAELightning(config)</code> and wraps a
+<code>VQVAE1D</code> in <code>self.vqvae</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>forward(x)</code></td>
+<td>Returns <code>(recon, vq_loss, indices)</code></td>
+</tr>
+<tr>
+<td><code>training_step</code> / <code>validation_step</code></td>
+<td>Read the signal with <code>get_signal(batch)</code>: an <code>ECGBatch</code> (from <code>ECGDataModule</code>), a <code>{"signal"}</code> or legacy <code>{"ecg_signals"}</code> dict, or an <code>(ecg, features)</code> tuple</td>
+</tr>
+<tr>
+<td><code>reconstruct(x)</code></td>
+<td><code>no_grad</code>. Returns the reconstruction <code>[B, C, L]</code></td>
+</tr>
+<tr>
+<td><code>encode_to_indices(x)</code></td>
+<td><code>no_grad</code>. Returns code indices <code>[B, L_latent]</code>. The prior uses this</td>
+</tr>
+<tr>
+<td><code>decode_from_indices(indices)</code></td>
+<td><code>no_grad</code>. Returns an ECG <code>[B, C, L_latent * factor]</code></td>
+</tr>
+<tr>
+<td><code>sample(n_samples=16, seq_length=5000)</code></td>
+<td>Decodes <strong>uniformly random</strong> code indices. Useful only as a sanity check. Use the prior for real generation</td>
+</tr>
+<tr>
+<td><code>configure_optimizers()</code></td>
+<td>Single Adam optimizer (<code>lr</code>, <code>betas=(b1, b2)</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>reconstruct</code>, <code>encode_to_indices</code>, <code>decode_from_indices</code> and <code>sample</code> put the inner model in
+<code>eval()</code> mode.</p>
+<p>Logged metrics:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train/total_loss</code>, <code>train/recon_loss</code>, <code>train/vq_loss</code></td>
+<td>Every step and epoch</td>
+</tr>
+<tr>
+<td><code>train/unique_codes</code>, <code>train/codebook_usage</code></td>
+<td>Every 100th training batch. <code>codebook_usage = unique_codes / num_embeddings</code></td>
+</tr>
+<tr>
+<td><code>val/total_loss</code>, <code>val/recon_loss</code>, <code>val/vq_loss</code></td>
+<td>Per epoch</td>
+</tr>
+<tr>
+<td><code>val_loss</code></td>
+<td>Per epoch (same as <code>val/total_loss</code>). Monitored by checkpointing and early stopping</td>
+</tr>
+<tr>
+<td><code>val/unique_codes</code>, <code>val/codebook_usage</code></td>
+<td>Per epoch</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Watch codebook usage</p>
+<p>A low <code>codebook_usage</code> means codebook collapse: only a few codes are ever selected. That
+limits reconstruction quality and makes the prior's job trivial.</p>
+</div>
+<h3 id="priorlightning-stage-2"><code>PriorLightning</code> (stage 2)<a class="headerlink" href="#priorlightning-stage-2" title="Permanent link">&para;</a></h3>
+<p><code>src/ecgen/families/vqvae/prior_lightning.py</code>. Constructed as <code>PriorLightning(config)</code> and wraps a
+<code>PixelCNNPrior</code> in <code>self.prior</code>. The frozen VQ-VAE in <code>self.vqvae</code> is set up in one of two ways:</p>
+<ul>
+<li>If <code>config.vqvae_config</code> is set (the case when restoring a prior checkpoint), <code>__init__</code> builds
+  an untrained <code>VQVAELightning(config.vqvae_config)</code>, calls <code>.eval()</code> and <code>.freeze()</code>, and the
+  weights are then filled in from the prior checkpoint's own <code>state_dict</code>.</li>
+<li>Otherwise, if <code>config.vqvae_checkpoint</code> is non-empty, <code>__init__</code> loads it with
+  <code>VQVAELightning.load_from_checkpoint(path, map_location="cpu")</code>, calls <code>.eval()</code> and
+  <code>.freeze()</code>, and records the VQ-VAE's config as <code>vqvae_config</code> in the prior's hyperparameters.
+  It raises <code>FileNotFoundError</code> if the path does not exist.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>forward(indices)</code></td>
+<td>Returns the prior logits <code>[B, K, L]</code></td>
+</tr>
+<tr>
+<td><code>compute_loss(indices)</code></td>
+<td>Returns <code>prior_loss(self.prior(indices), indices)</code>: cross-entropy of each code given the codes before it</td>
+</tr>
+<tr>
+<td><code>training_step</code> / <code>validation_step</code></td>
+<td>Encode the batch with the frozen VQ-VAE (<code>encode_to_indices</code>), then return <code>compute_loss(indices)</code>. Raise <code>RuntimeError</code> if no VQ-VAE is loaded</td>
+</tr>
+<tr>
+<td><code>sample(n_samples=16, seq_length=5000, temperature=1.0)</code></td>
+<td>Samples indices from the prior and decodes them with the VQ-VAE. See the factor-16 warning above</td>
+</tr>
+<tr>
+<td><code>configure_optimizers()</code></td>
+<td>Adam over <code>self.prior</code> parameters only</td>
+</tr>
+</tbody>
+</table>
+<p>Logged metrics: <code>train/loss</code> (per step and epoch), and <code>val/loss</code> and <code>val_loss</code> (per epoch).</p>
+<p>Because <code>self.vqvae</code> is a registered submodule, the frozen VQ-VAE weights are saved inside
+every prior checkpoint, under keys <code>vqvae.vqvae.*</code>. Together with the recorded <code>vqvae_config</code>,
+this makes a prior checkpoint self-contained (see <a href="#loading-checkpoints">Loading checkpoints</a>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Retrain stage-2 checkpoints from before the prior rewrite</p>
+<p>The prior used to be a stack of mask-A/B <code>GatedMaskedConv1d</code> layers. Prior checkpoints from
+that architecture have different <code>state_dict</code> keys and cannot be loaded into the current
+<code>PriorLightning</code>. Retrain stage 2 from your stage-1 checkpoint. Stage-1 VQ-VAE checkpoints
+are not affected.</p>
+</div>
+<h2 id="loading-checkpoints">Loading checkpoints<a class="headerlink" href="#loading-checkpoints" title="Permanent link">&para;</a></h2>
+<p>Both wrappers accept either <code>config=</code> or the flat config fields as keyword arguments, which is
+how <code>save_hyperparameters(config.__dict__)</code> stores them. A plain <code>load_from_checkpoint(path)</code>
+therefore works, for checkpoints written before and after this was fixed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ecgen.families.vqvae</span><span class="w"> </span><span class="kn">import</span> <span class="n">VQVAELightning</span><span class="p">,</span> <span class="n">PriorLightning</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">vqvae</span> <span class="o">=</span> <span class="n">VQVAELightning</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">"runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="s2">"cpu"</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">prior</span> <span class="o">=</span> <span class="n">PriorLightning</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="s2">"runs/prior_mimic/seed_42/checkpoints/last.ckpt"</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="s2">"cpu"</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>
+</code></pre></div>
+<ul>
+<li>Passing <code>config=VQVAEConfig(...)</code> / <code>config=PriorConfig(...)</code> explicitly still works and
+  takes precedence over the stored hyperparameters.</li>
+<li>Unknown keyword arguments raise <code>TypeError: Unexpected VQVAEConfig fields: [...]</code> (or
+  <code>PriorConfig</code>).</li>
+<li>A prior checkpoint stores <code>vqvae_config</code>, so <code>PriorLightning.load_from_checkpoint</code> rebuilds the
+  frozen VQ-VAE from the prior checkpoint's own weights and does <strong>not</strong> read the stage-1 file.
+  Prior checkpoints saved before <code>vqvae_config</code> was added lack this field and still load the
+  VQ-VAE from the stored <code>vqvae_checkpoint</code> path, so that file must exist (pass
+  <code>vqvae_checkpoint=&lt;path&gt;</code> to <code>load_from_checkpoint</code> if it has moved).</li>
+</ul>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="reconstruction-and-code-extraction">Reconstruction and code extraction<a class="headerlink" href="#reconstruction-and-code-extraction" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ecgen.families.vqvae</span><span class="w"> </span><span class="kn">import</span> <span class="n">VQVAELightning</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">vqvae</span> <span class="o">=</span> <span class="n">VQVAELightning</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">"runs/vqvae_mimic/seed_42/checkpoints/last.ckpt"</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="s2">"cpu"</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span>                 <span class="c1"># [B, leads, samples]</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">recon</span> <span class="o">=</span> <span class="n">vqvae</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>                 <span class="c1"># [4, 12, 5000]</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">vqvae</span><span class="o">.</span><span class="n">encode_to_indices</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>         <span class="c1"># [4, 625], dtype long</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">x_hat</span> <span class="o">=</span> <span class="n">vqvae</span><span class="o">.</span><span class="n">decode_from_indices</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>   <span class="c1"># [4, 12, 5000]</span>
+</code></pre></div>
+<h3 id="sampling-example">Sampling example<a class="headerlink" href="#sampling-example" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ecgen.families.vqvae</span><span class="w"> </span><span class="kn">import</span> <span class="n">PriorLightning</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">device</span> <span class="o">=</span> <span class="s2">"cuda"</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">"cpu"</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1"># The prior checkpoint also contains the frozen VQ-VAE (weights + config)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">prior</span> <span class="o">=</span> <span class="n">PriorLightning</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="s2">"runs/prior_mimic/seed_42/checkpoints/last.ckpt"</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="n">device</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">ecgs</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">n_samples</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">seq_length</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>      <span class="c1"># must be a multiple of the VQ-VAE downsampling factor (8)</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>      <span class="c1"># &gt;1 more diverse, &lt;1 more conservative</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">)</span>                         <span class="c1"># [16, 12, 5000]</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="c1"># Or step by step: sample 625 codes, then decode them</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="n">indices</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">latent_length</span><span class="o">=</span><span class="n">prior</span><span class="o">.</span><span class="n">vqvae</span><span class="o">.</span><span class="n">latent_length</span><span class="p">(</span><span class="mi">5000</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="p">)</span>                                               <span class="c1"># [16, 625]</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="n">ecgs</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">vqvae</span><span class="o">.</span><span class="n">decode_from_indices</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="c1"># [16, 12, 5000]</span>
+</code></pre></div>
+<p>Sampling is sequential over the 625 latent positions. Each step runs a forward pass of the
+prior over the last <code>receptive_field</code> codes (all of them with the defaults), so expect it to be
+slow on CPU.</p>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../training/vqvae_training/">VQ-VAE Training</a>: how to train stages 1 and 2</li>
+<li><a href="../vae/">VAE</a>: the continuous-latent counterpart that shares the encoder and decoder</li>
+<li><a href="../architecture/">Architecture Overview</a></li>
+<li><a href="../../api/models/">Models API</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../vae/" class="md-footer__link md-footer__link--prev" aria-label="Previous: VAE">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                VAE
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../gan/" class="md-footer__link md-footer__link--next" aria-label="Next: Pulse2Pulse GAN">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Pulse2Pulse GAN
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 ECGEN contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/vlbthambawita/ECGEN" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="../../javascripts/architecture.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
